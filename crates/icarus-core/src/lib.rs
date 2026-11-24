@@ -27,11 +27,15 @@
 
 #![forbid(unsafe_code)]
 
+pub mod control;
+pub mod eval;
 pub mod physics;
 pub mod replay;
 pub mod rng;
 pub mod sim;
 
+pub use control::{Controller, ControllerKind, Observation, Pid};
+pub use eval::{EpisodeResult, Scenario};
 pub use physics::params::{Params, VehicleConfig};
 pub use physics::scenario::{CrashReason, Outcome};
 pub use physics::state::{Controls, State};
