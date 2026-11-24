@@ -13,32 +13,20 @@
     <canvas id="view" role="img" aria-label="Rocket landing simulation"></canvas>
 
     <header class="topbar">
-      <div class="brand">ICARUS <span class="tag">GNC SIM</span></div>
-      <div class="config" role="group" aria-label="Difficulty">
-        <button type="button" data-config="easy" title="Can hover, engine running (1)">Easy</button>
-        <button type="button" data-config="realistic" title="Cannot hover: one ignition, hoverslam (2)">Realistic</button>
-      </div>
+      <button type="button" class="brand" id="btn-menu" title="Main menu">ICARUS</button>
+      <span class="mission" id="mission"></span>
       <div class="actions">
         <span class="seed" title="Scenario seed">SEED <span id="seed">—</span></span>
-        <span class="seed" title="Your best score on this difficulty (stored in this browser)">BEST <span id="best">—</span></span>
-        <button type="button" id="btn-charts" title="Telemetry charts (T)" aria-pressed="false">Charts</button>
-        <button type="button" id="btn-pause" title="Pause (P)">Pause</button>
-        <button type="button" id="btn-restart" title="Restart this scenario (R)">Retry</button>
-        <button type="button" id="btn-new" title="New random scenario (N)">New</button>
+        <span class="seed" title="Your best score on this mission (stored in this browser)">BEST <span id="best">—</span></span>
+        <button type="button" id="btn-charts" title="Telemetry charts" aria-pressed="false">Charts</button>
+        <button type="button" id="btn-sound" title="Sound effects" aria-pressed="true">Sound</button>
+        <button type="button" id="btn-pause" title="Pause (Esc)">Pause</button>
       </div>
     </header>
 
     <aside class="hud" id="hud" aria-live="off"></aside>
 
     <aside class="charts" id="charts" aria-label="Telemetry charts" hidden></aside>
-
-    <aside class="faults" id="faults" aria-label="Inject a failure" hidden>
-      <div class="faults-title">INJECT FAILURE</div>
-      <button type="button" data-fault="gimbal" title="Jam the gimbal where it is (7)">Gimbal stuck</button>
-      <button type="button" data-fault="thrust" title="Lose 30% of the remaining thrust (8)">Thrust −30%</button>
-      <button type="button" data-fault="gust-left" title="12 m/s gust from the right (9)">Gust ←</button>
-      <button type="button" data-fault="gust-right" title="12 m/s gust from the left (0)">Gust →</button>
-    </aside>
 
     <div class="replay-bar" id="replay-bar" hidden>
       <span id="replay-label">REPLAY</span>
@@ -54,15 +42,13 @@
 
     <footer class="help">
       <span><kbd>↑</kbd><kbd>↓</kbd> throttle</span>
-      <span><kbd>←</kbd><kbd>→</kbd> gimbal</span>
+      <span><kbd>←</kbd><kbd>→</kbd> steer</span>
       <span><kbd>Q</kbd><kbd>E</kbd> RCS</span>
       <span><kbd>X</kbd> cut engine</span>
-      <span><kbd>Z</kbd> full throttle</span>
-      <span><kbd>T</kbd> charts</span>
-      <span><kbd>7</kbd>–<kbd>0</kbd> failures</span>
-      <span><kbd>P</kbd> pause</span>
-      <span><kbd>R</kbd> retry</span>
+      <span><kbd>Esc</kbd> pause</span>
     </footer>
+
+    <section class="menu" id="menu" aria-label="Main menu" hidden></section>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
