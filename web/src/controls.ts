@@ -96,6 +96,17 @@ export class InputState {
     this.minRunning = clampLevel(minRunning);
   }
 
+  /**
+   * Sets the throttle directly (touch slider). Like ramping down, it stops at
+   * minimum throttle while the engine runs: only the cut-off control shuts it off.
+   */
+  setThrottle(level: number): void {
+    if (!Number.isFinite(level)) return;
+    const target = clampLevel(level);
+    const running = this.throttle >= this.minRunning;
+    this.throttle = running ? Math.max(target, this.minRunning) : target;
+  }
+
   get throttleLevel(): number {
     return this.throttle;
   }
