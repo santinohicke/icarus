@@ -22,6 +22,8 @@ interface Pose {
   cm: number;
   vx: number;
   vy: number;
+  /** RCS torque, N·m (positive = counter-clockwise). */
+  rcs: number;
 }
 
 const COLORS = {
@@ -135,6 +137,7 @@ export class Renderer {
       cm: cur.cm_height,
       vx: cur.vx,
       vy: cur.vy,
+      rcs: cur.rcs_torque,
     };
 
     const target = this.targetCamera(pose, info);
@@ -348,6 +351,30 @@ export class Renderer {
     const finY = -nose + 0.03 * len;
     ctx.fillRect(-width / 2 - width * 0.45, finY, width * 0.45, 0.035 * len);
     ctx.fillRect(width / 2, finY, width * 0.45, 0.035 * len);
+
+    // RCS: white cold-gas jets near the nose, exhausting opposite to the push.
+    // A counter-clockwise torque pushes the nose left, so the gas goes right.
+    if (Math.abs(p.rcs) > 1 && !ended) {
+      const dir = p.rcs > 0 ? 1 : -1;
+      const y = -nose + 0.06 * len;
+      const reach = Math.max(16, 0.3 * len);
+      for (let i = 0; i < 3; i += 1) {
+        const l = reach * (0.6 + Math.random() * 0.5);
+        const spread = l * (0.18 + 0.06 * i);
+        const x0 = dir * (width / 2);
+        const g = ctx.createLinearGradient(x0, y, x0 + dir * l, y);
+        g.addColorStop(0, "rgba(255, 255, 255, 0.85)");
+        g.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(x0, y - 1);
+        ctx.lineTo(x0 + dir * l, y - spread);
+        ctx.lineTo(x0 + dir * l, y + spread);
+        ctx.lineTo(x0, y + 1);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
 
     ctx.restore();
   }
