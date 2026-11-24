@@ -6,6 +6,7 @@
 //! [`telemetry_fields`]). Every run is recorded and can be exported as a
 //! replay string; [`WasmReplay`] plays one back tick by tick.
 
+use icarus_core::control::{Controller, ControllerKind, Observation};
 use icarus_core::physics::scenario::Outcome;
 use icarus_core::{Injection, RecordingSim, Replay, Sim, TELEMETRY_FIELDS, VehicleConfig};
 use wasm_bindgen::prelude::*;
@@ -157,6 +158,41 @@ impl WasmSim {
             .replay()
             .encode()
             .map_err(|e| JsError::new(&e.to_string()))
+    }
+}
+
+/// A classical controller (autopilot) that flies a [`WasmSim`] through the
+/// same quantized interface as a player. Its decisions are bit-identical to
+/// the native and Python builds.
+#[wasm_bindgen]
+pub struct WasmController {
+    inner: Box<dyn Controller + Send + Sync>,
+}
+
+#[wasm_bindgen]
+impl WasmController {
+    /// A controller by name (`"pid"`) for a vehicle configuration.
+    #[wasm_bindgen(constructor)]
+    pub fn new(controller: &str, config: &str) -> Result<WasmController, JsError> {
+        let kind = ControllerKind::from_name(controller)
+            .ok_or_else(|| JsError::new(&format!("unknown controller {controller:?}")))?;
+        let params = parse_config(config)?.params();
+        Ok(Self {
+            inner: kind.build(&params),
+        })
+    }
+
+    /// Quantized commands `[throttle, gimbal, rcs]` for the sim's current tick.
+    /// Call exactly once per tick, before `sim.step`.
+    pub fn act(&mut self, sim: &WasmSim) -> Vec<u8> {
+        self.inner
+            .act_quantized(&Observation::from_sim(sim.inner.sim()))
+            .to_vec()
+    }
+
+    /// Forgets the internal state, for a new episode.
+    pub fn reset(&mut self) {
+        self.inner.reset();
     }
 }
 
