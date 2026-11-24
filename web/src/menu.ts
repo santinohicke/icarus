@@ -1,6 +1,5 @@
-// Main menu: the Earth seen from orbit with a small rocket circling it, and a
-// monochrome mission-console menu on top (same art direction as the Space
-// Corporation menu sketch). All markup is built with DOM APIs, no innerHTML.
+// Main menu: the Earth seen from orbit with a small rocket circling it, and
+// the mission list on top. All markup is built with DOM APIs, no innerHTML.
 
 import { geoDistance, geoOrthographic, geoPath } from "d3-geo";
 import type { GeometryObject, Topology } from "topojson-specification";
@@ -20,7 +19,6 @@ const ORBIT = { cx: 500, cy: 300, rx: 300, ry: 64, tilt: (-10 * Math.PI) / 180 }
 export interface MenuLevel {
   config: Config;
   title: string;
-  subtitle: string;
   best: number | null;
   /** Landed at least once (even if the score has since been reset). */
   landed: boolean;
@@ -229,10 +227,8 @@ export class MainMenu {
   private readonly scene: SVGSVGElement;
   private readonly rocket: SVGGElement;
   private readonly list: HTMLElement;
-  private readonly clock: HTMLSpanElement;
   private readonly soundItem: HTMLButtonElement;
   private frame: number | null = null;
-  private shownAt = 0;
   private angle = 2.6;
   private lastTime: number | null = null;
 
@@ -248,52 +244,43 @@ export class MainMenu {
     this.rocket = rocket;
 
     const panel = html("div", "menu-panel");
-    const title = html("h1", "menu-title", "ICARUS");
-    const tagline = html("div", "menu-tagline", "LAND THE FIRST STAGE");
-    const rule = html("div", "menu-rule");
+    const title = html("h1", "menu-title", "Icarus");
+    const tagline = html("p", "menu-tagline", "Land the rocket");
     this.list = html("nav", "menu-levels");
     this.list.setAttribute("aria-label", "Choose a mission");
-    this.soundItem = html("button", "menu-item menu-small");
+    panel.append(title, tagline, this.list);
+
+    const footer = html("div", "menu-footer");
+    this.soundItem = html("button", "menu-sound");
     this.soundItem.type = "button";
     this.soundItem.addEventListener("click", () => this.setSoundLabel(this.onToggleSound()));
     this.setSoundLabel(soundOn);
-    panel.append(title, tagline, rule, this.list, this.soundItem);
-
-    const footer = html("div", "menu-footer");
-    const status = html("span", "menu-status");
-    status.append(html("span", "menu-dot"), document.createTextNode("ALL SYSTEMS NOMINAL"));
-    this.clock = html("span", "", "T+ 00:00:00");
-    footer.append(html("span", "", version), status, this.clock);
+    footer.append(this.soundItem, html("span", "menu-version", version));
 
     root.replaceChildren(scene, panel, footer);
   }
 
   private setSoundLabel(on: boolean): void {
-    this.soundItem.textContent = on ? "SOUND · ON" : "SOUND · OFF";
+    this.soundItem.textContent = on ? "Sound on" : "Sound off";
     this.soundItem.setAttribute("aria-pressed", String(on));
   }
 
   show(levels: readonly MenuLevel[]): void {
     const items = levels.map((level, i) => {
-      const b = html("button", "menu-item menu-level");
+      const b = html("button", "menu-level");
       b.type = "button";
-      const line = html("span", "menu-line");
-      const index = html("span", "menu-index", String(i + 1).padStart(2, "0"));
-      const text = html("span", "menu-text");
-      text.append(html("span", "menu-level-title", level.title), html("span", "menu-level-sub", level.subtitle));
-      if (level.best !== null) {
-        text.append(html("span", "menu-level-best", `BEST ${level.best} PTS`));
-      } else if (level.landed) {
-        text.append(html("span", "menu-level-best", "LANDED"));
-      }
-      b.append(line, index, text);
+      const index = html("span", "menu-index", String(i + 1));
+      const title = html("span", "menu-level-title", level.title);
+      const status = html("span", "menu-level-best");
+      if (level.best !== null) status.textContent = `Best ${level.best.toLocaleString("en-US")}`;
+      else if (level.landed) status.textContent = "Landed";
+      b.append(index, title, status);
       b.addEventListener("click", () => this.onPick(level.config));
       b.addEventListener("mouseenter", () => b.focus({ preventScroll: true }));
       return b;
     });
     this.list.replaceChildren(...items);
     this.root.hidden = false;
-    this.shownAt = performance.now();
     this.lastTime = null;
     // Every level is open; the cursor starts on the first one not landed yet
     // (the suggested next mission), or the last one once all are done.
@@ -314,7 +301,7 @@ export class MainMenu {
 
   /** Arrow keys move between menu items while the menu is open. */
   moveFocus(delta: number): void {
-    const items = [...this.root.querySelectorAll<HTMLButtonElement>(".menu-item")];
+    const items = [...this.root.querySelectorAll<HTMLButtonElement>(".menu-level, .menu-sound")];
     if (items.length === 0) return;
     const i = items.indexOf(document.activeElement as HTMLButtonElement);
     const next = i < 0 ? items[delta > 0 ? 0 : items.length - 1] : items[(i + delta + items.length) % items.length];
@@ -339,12 +326,6 @@ export class MainMenu {
     const behind = Math.sin(this.angle) < -0.2 && Math.cos(this.angle) > -0.3;
     this.rocket.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${heading.toFixed(1)}) scale(1.4)`);
     this.rocket.setAttribute("opacity", behind ? "0.25" : "1");
-
-    const seconds = Math.floor((now - this.shownAt) / 1000);
-    const pad = (n: number): string => String(n).padStart(2, "0");
-    const text = `T+ ${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
-    if (this.clock.textContent !== text) this.clock.textContent = text;
-    this.root.style.setProperty("--blink", seconds % 2 ? "0.3" : "1");
     this.frame = requestAnimationFrame((t) => this.animate(t));
   }
 }

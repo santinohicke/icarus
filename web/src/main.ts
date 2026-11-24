@@ -1,7 +1,15 @@
 // Icarus web front-end: main menu, manual landing, replays and local scores.
 
+import "@fontsource/barlow/400.css";
+import "@fontsource/barlow/500.css";
+import "@fontsource/barlow/600.css";
+import "@fontsource/barlow-condensed/500.css";
+import "@fontsource/barlow-condensed/600.css";
+import "@fontsource/barlow-condensed/700.css";
+
 import { Sound } from "./audio";
 import { KeyboardControls, Q_CENTER, minRunningLevel } from "./controls";
+import { flightStats, limitStats, outcomeAdvice, outcomeTitle, type Stat, statGrid } from "./debrief";
 import { Hud } from "./hud";
 import { FixedLoop } from "./loop";
 import { MainMenu } from "./menu";
@@ -13,8 +21,6 @@ import {
   CONFIGS,
   type Config,
   type FlightView,
-  type Telemetry,
-  type VehicleInfo,
   ReplayPlayer,
   Simulation,
   getPhysicsVersion,
@@ -30,46 +36,36 @@ type Mode = "fly" | "replay" | "auto";
 
 const VERSION = "v0.2.0";
 const U64_MAX = (1n << 64n) - 1n;
-const DEG = Math.PI / 180;
 const REPLAY_SPEEDS = [1, 2, 4] as const;
 /** Outcome codes that end in an explosion (crashes), as opposed to landing or timing out. */
 const CRASH_CODES = new Set([2, 3, 4, 5, 6, 7]);
 
-const MISSION: Record<Config, { title: string; subtitle: string; blurb: string }> = {
+const MISSION: Record<Config, { title: string; blurb: string }> = {
   training: {
-    title: "TRAINING",
-    subtitle: "LOW · SLOW · CALM AIR",
-    blurb:
-      "Your first landing. The engine is running and can throttle below the stage's weight, so you can hover. Low and slow, almost no wind, a wide pad, and gentler touchdown limits: up to 3 m/s down.",
+    title: "Training",
+    blurb: "Your first landing. The engine is running and can hover, the air is calm and the pad is wide.",
   },
   easy: {
-    title: "EASY",
-    subtitle: "HOVER-CAPABLE · 3 RELIGHTS",
-    blurb: "Engine running, 3 relights. The engine can throttle below the stage's weight, so you can hover.",
+    title: "Easy",
+    blurb: "The engine is running and can hover, with 3 relights if you cut it.",
   },
   crosswind: {
-    title: "CROSSWIND",
-    subtitle: "STRONG WIND · GUSTS · NARROW PAD",
-    blurb:
-      "The same hover-capable stage, but in strong wind with frequent gusts, starting further away from a narrower pad. Lean into the wind.",
+    title: "Crosswind",
+    blurb: "Strong wind and gusts push you off a narrower pad. Lean into the wind.",
   },
   realistic: {
-    title: "REALISTIC",
-    subtitle: "HOVERSLAM · ONE IGNITION",
+    title: "Realistic",
     blurb:
-      "Engine off, one ignition. Even at minimum throttle the engine is stronger than the stage's weight: you cannot hover. Light it at the right altitude and land in a single burn.",
+      "Engine off and one ignition. Even at minimum throttle it out-pushes the stage's weight, so you cannot hover: light it at the right height and land in one burn.",
   },
   storm: {
-    title: "STORM",
-    subtitle: "HOVERSLAM · GALE · LAGGY SENSORS",
-    blurb:
-      "A hoverslam in a storm: very strong wind and gusts, and sensors that lag twice as much. One ignition, no hovering.",
+    title: "Storm",
+    blurb: "One-burn landing in a gale, with sensors that lag twice as much.",
   },
   engine_out: {
-    title: "ENGINE OUT",
-    subtitle: "HOVERSLAM · SOMETHING WILL FAIL",
+    title: "Engine out",
     blurb:
-      "A hoverslam where something always breaks during the descent: the gimbal jams (cancel the spin with RCS, Q/E) or the engine loses thrust (light it earlier).",
+      "One-burn landing where something breaks on the way down: the gimbal jams (fight the spin with Q and E) or thrust drops (light earlier).",
   },
 };
 
@@ -103,41 +99,6 @@ class Progress {
     } catch {
       // keep the in-memory record
     }
-  }
-}
-
-const OUTCOME_TEXT: Record<string, string> = {
-  landed: "Touchdown confirmed",
-  crashed_tipped_over: "Tipped over",
-  crashed_off_pad: "Missed the pad",
-  crashed_vertical_speed: "Vertical speed too high at touchdown",
-  crashed_horizontal_speed: "Sideways speed too high at touchdown",
-  crashed_tilt: "Too tilted at touchdown",
-  crashed_angular_rate: "Rotating too fast at touchdown",
-  out_of_propellant: "Out of propellant",
-  out_of_bounds: "Left the landing zone",
-  time_limit: "Ran out of time",
-  diverged: "Simulation error",
-};
-
-/**
- * What exactly went wrong, with the measured value against the limit, e.g.
- * "Too fast: 4.2 m/s down, max 3.0". Null when there is nothing to measure.
- */
-function failureDetail(outcome: string, s: Telemetry, info: VehicleInfo): string | null {
-  switch (outcome) {
-    case "crashed_vertical_speed":
-      return `Too fast: ${Math.abs(s.contact_vy).toFixed(1)} m/s down, max ${info.max_vertical_speed.toFixed(1)}`;
-    case "crashed_horizontal_speed":
-      return `Sliding sideways: ${Math.abs(s.contact_vx).toFixed(1)} m/s, max ${info.max_horizontal_speed.toFixed(1)}`;
-    case "crashed_tilt":
-      return `Leaning ${(Math.abs(Math.atan2(Math.sin(s.theta), Math.cos(s.theta))) / DEG).toFixed(1)}°, max ${(info.max_tilt / DEG).toFixed(0)}°`;
-    case "crashed_angular_rate":
-      return `Spinning ${(Math.abs(s.omega) / DEG).toFixed(1)}°/s, max ${(info.max_angular_rate / DEG).toFixed(1)}°/s`;
-    case "crashed_off_pad":
-      return `Missed the pad by ${Math.max(0, -s.pad_margin).toFixed(1)} m`;
-    default:
-      return null;
   }
 }
 
@@ -178,7 +139,20 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-type Action = [label: string, handler: (button: HTMLButtonElement) => void];
+type Action = [label: string, handler: () => void];
+
+interface CardOptions {
+  title: string;
+  tone?: "success" | "failure";
+  /** Large figure under the title (the score of a landing). */
+  hero?: { value: string; label: string } | undefined;
+  lead?: string | undefined;
+  stats?: readonly Stat[];
+  actions: readonly Action[];
+  extra?: HTMLElement | null;
+  /** Keyboard hint at the bottom, e.g. "Space launches". */
+  hint?: string;
+}
 
 class App {
   private mode: Mode = "fly";
@@ -206,9 +180,9 @@ class App {
   private readonly loop: FixedLoop;
   private readonly overlay = byId("overlay", HTMLDivElement);
   private readonly card = byId("overlay-card", HTMLDivElement);
-  private readonly seedLabel = byId("seed", HTMLSpanElement);
   private readonly bestLabel = byId("best", HTMLSpanElement);
   private readonly missionLabel = byId("mission", HTMLSpanElement);
+  private readonly modeLabel = byId("mode", HTMLSpanElement);
   private readonly pauseButton = byId("btn-pause", HTMLButtonElement);
   private readonly chartsButton = byId("btn-charts", HTMLButtonElement);
   private readonly soundButton = byId("btn-sound", HTMLButtonElement);
@@ -372,7 +346,6 @@ class App {
         return {
           config,
           title: MISSION[config].title,
-          subtitle: MISSION[config].subtitle,
           best,
           landed: best !== null || this.progress.has(config),
         };
@@ -382,7 +355,16 @@ class App {
 
   private restart(): void {
     if (this.mode === "replay") this.replayAgain();
-    else this.newRun(this.lastScenario.config, this.lastScenario.seed, this.mode === "auto");
+    else if (this.mode === "auto") this.watchAutopilot();
+    else this.newRun(this.lastScenario.config, this.lastScenario.seed);
+  }
+
+  /**
+   * The autopilot flies a fresh scenario of the current level. A new seed each
+   * time, since the same seed would replay exactly the same flight.
+   */
+  private watchAutopilot(): void {
+    this.newRun(this.lastScenario.config, randomSeed(), true);
   }
 
   /** A new run of `config` with `seed`, flown by the player or (auto) the autopilot. */
@@ -421,10 +403,10 @@ class App {
       } else if (this.phase === "running") {
         this.pause();
       }
-      this.showCard(
-        "INVALID REPLAY",
-        ["This replay link is damaged or was recorded with a different version of the physics."],
-        [
+      this.showCard({
+        title: "Replay unavailable",
+        lead: "This replay link is damaged or was recorded with an older version of the physics.",
+        actions: [
           [
             "Fly instead",
             () => {
@@ -434,7 +416,7 @@ class App {
           ],
           ["Main menu", () => this.showMenu()],
         ],
-      );
+      });
       return false;
     }
     this.menu.hide();
@@ -470,11 +452,12 @@ class App {
   private updateChrome(): void {
     const { config, seed } = this.lastScenario;
     const replay = this.mode === "replay";
-    this.seedLabel.textContent = seed.toString();
-    const prefix = replay ? "REPLAY · " : this.mode === "auto" ? "AUTOPILOT · " : "";
-    this.missionLabel.textContent = `${prefix}${MISSION[config].title}`;
+    this.missionLabel.textContent = MISSION[config].title;
+    this.missionLabel.title = `Scenario ${seed.toString()}`;
+    this.modeLabel.textContent = replay ? "Replay" : this.mode === "auto" ? "Autopilot" : "";
+    this.modeLabel.hidden = this.mode === "fly";
     const best = this.scores.best(config);
-    this.bestLabel.textContent = best === null ? "—" : String(best);
+    this.bestLabel.textContent = best === null ? "—" : best.toLocaleString("en-US");
     this.pauseButton.textContent = this.phase === "paused" ? "Resume" : "Pause";
     this.replayBar.hidden = !replay || this.phase === "menu";
     this.speedButton.textContent = `${REPLAY_SPEEDS[this.speedIndex] ?? 1}×`;
@@ -505,12 +488,12 @@ class App {
     if (this.mode === "fly") {
       actions.push(["Retry", () => this.restart()], ["New scenario", () => this.newRun(this.lastScenario.config, randomSeed())]);
     } else if (this.mode === "auto") {
-      actions.push(["Watch again", () => this.restart()], ["Fly it yourself", () => this.flyYourself()]);
+      actions.push(["Watch again", () => this.watchAutopilot()], ["Fly it yourself", () => this.flyYourself()]);
     } else {
       actions.push(["Watch again", () => this.replayAgain()]);
     }
     actions.push(["Main menu", () => this.showMenu()]);
-    this.showCard("PAUSED", [], actions, "Esc resumes.");
+    this.showCard({ title: "Paused", actions, hint: "Esc resumes" });
   }
 
   private togglePause(): void {
@@ -556,7 +539,7 @@ class App {
       const [throttle, , rcs] = this.player.lastInput;
       this.hud.update(view.state, view.info, throttle, rcs);
       const total = (this.player.totalTicks * view.info.dt).toFixed(1);
-      this.replayLabel.textContent = `REPLAY · T+${view.state.time.toFixed(1)} / ${total} s`;
+      this.replayLabel.textContent = `Replay ${view.state.time.toFixed(1)} / ${total} s`;
     } else {
       const level = this.mode === "auto" ? this.autoInput[0] : this.controls.input.throttleLevel;
       this.hud.update(view.state, view.info, level, this.lastRcs);
@@ -578,83 +561,75 @@ class App {
     const landed = view.outcome === 1;
     if (landed) this.sound.land();
     else if (CRASH_CODES.has(view.outcome)) this.sound.explode();
-    const detail = failureDetail(view.outcomeName, s, view.info);
-    const lines = [
-      detail ?? OUTCOME_TEXT[view.outcomeName] ?? (view.outcomeName || "Replay ended before touchdown"),
-      `Leg contact: vertical ${s.contact_vy.toFixed(2)} m/s · sideways ${s.contact_vx.toFixed(2)} m/s · ${Math.round(s.propellant)} kg left`,
-    ];
+    const debrief = {
+      title: outcomeTitle(view.outcomeName),
+      tone: landed ? ("success" as const) : ("failure" as const),
+      stats: flightStats(s, view.info),
+      lead: landed ? undefined : (outcomeAdvice(view.outcomeName, view.info) ?? undefined),
+    };
 
     if (this.mode === "replay") {
-      this.showCard(
-        landed ? `REPLAY · LANDED · ${view.score} pts` : view.outcome === 0 ? "REPLAY · ENDED" : "REPLAY · MISSION FAILED",
-        lines,
-        [
+      this.showCard({
+        ...debrief,
+        hero: landed ? { value: view.score.toLocaleString("en-US"), label: "points" } : undefined,
+        actions: [
           ["Watch again", () => this.replayAgain()],
           ["Fly this scenario", () => this.exitReplay()],
           ["Main menu", () => this.showMenu()],
         ],
-        undefined,
-        landed ? "success" : "failure",
-      );
+      });
       return;
     }
 
     const sim = this.sim;
     if (sim === null) return;
-    let replay: string | null = null;
-    try {
-      replay = sim.replay();
-    } catch (error) {
-      console.error(error);
-    }
+    const hero = landed ? { value: sim.score.toLocaleString("en-US"), label: "points" } : undefined;
     if (this.mode === "auto") {
       // The autopilot's landings never count for the player's scores or progress.
-      // Same seed gives the same flight, so a new attempt needs a new scenario.
-      const tryAnother: Action = [landed ? "Watch another" : "Try again", () => this.newRun(sim.config, randomSeed(), true)];
-      const actions: Action[] = [
-        tryAnother,
-        ["Watch again", () => this.restart()],
-        ["Fly it yourself", () => this.flyYourself()],
-      ];
-      if (replay !== null) {
-        const link = replayUrl(window.location.href, replay);
-        actions.push(["Share replay", (button) => void this.copy(button, link, "Replay link")]);
-      }
-      actions.push(["Main menu", () => this.showMenu()]);
-      this.showCard(
-        landed ? `AUTOPILOT · LANDED · ${sim.score} pts` : "AUTOPILOT · MISSION FAILED",
-        lines,
-        actions,
-        "The autopilot is a cascaded PID written in Rust and running here as WebAssembly. It only sees noisy, delayed sensors.",
-        landed ? "success" : "failure",
-      );
+      this.showCard({
+        ...debrief,
+        hero,
+        actions: [
+          ["Watch again", () => this.watchAutopilot()],
+          ["Fly it yourself", () => this.flyYourself()],
+          ["Main menu", () => this.showMenu()],
+        ],
+      });
       return;
     }
 
-    if (landed) this.progress.add(sim.config);
-    if (landed && replay !== null) {
-      const rank = this.scores.add({
-        config: sim.config,
-        seed: sim.seed.toString(),
-        score: sim.score,
-        date: Date.now(),
-        replay,
-        physics: getPhysicsVersion(),
-      });
-      if (rank === 1) lines.push(`New personal best on ${MISSION[sim.config].title}!`);
-      else if (rank !== null) lines.push(`#${rank} on your ${MISSION[sim.config].title} leaderboard.`);
-      this.updateChrome();
+    if (landed) {
+      this.progress.add(sim.config);
+      let replay: string | null = null;
+      try {
+        replay = sim.replay();
+      } catch (error) {
+        console.error(error);
+      }
+      if (replay !== null) {
+        const rank = this.scores.add({
+          config: sim.config,
+          seed: sim.seed.toString(),
+          score: sim.score,
+          date: Date.now(),
+          replay,
+          physics: getPhysicsVersion(),
+        });
+        if (hero !== undefined && rank === 1) hero.label = "points, a new personal best";
+        else if (hero !== undefined && rank !== null) hero.label = `points, your #${rank} on this level`;
+        this.updateChrome();
+      }
     }
-    const actions: Action[] = [
-      ["Retry", () => this.restart()],
-      ["New scenario", () => this.newRun(sim.config, randomSeed())],
-    ];
-    if (replay !== null) {
-      const link = replayUrl(window.location.href, replay);
-      actions.push(["Share replay", (button) => void this.copy(button, link, "Replay link")]);
-    }
-    actions.push(["Main menu", () => this.showMenu()]);
-    this.showCard(landed ? `LANDED · ${sim.score} pts` : "MISSION FAILED", lines, actions, undefined, landed ? "success" : "failure");
+    this.showCard({
+      ...debrief,
+      hero,
+      actions: [
+        ["Retry", () => this.restart()],
+        ["New scenario", () => this.newRun(sim.config, randomSeed())],
+        ["Main menu", () => this.showMenu()],
+      ],
+      hint: "Space retries",
+    });
   }
 
   /** The same scenario, flown by the player. */
@@ -662,45 +637,29 @@ class App {
     this.newRun(this.lastScenario.config, this.lastScenario.seed);
   }
 
-  private async copy(button: HTMLButtonElement, text: string, label: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(text);
-      if (button.isConnected) button.textContent = "Link copied";
-    } catch {
-      // No clipboard access (insecure context, denied permission): show the
-      // text so it can be copied by hand, in the card that was clicked.
-      if (!button.isConnected) return;
-      this.card.querySelector(".replay-text")?.remove();
-      const area = document.createElement("textarea");
-      area.readOnly = true;
-      area.className = "replay-text";
-      area.value = text;
-      area.setAttribute("aria-label", label);
-      this.card.append(area);
-      area.select();
-      button.textContent = "Select and copy";
-    }
-  }
-
   private scoreTable(config: Config): HTMLElement | null {
-    const top = this.scores.top(config, 5);
+    const top = this.scores.top(config, 3);
     if (top.length === 0) return null;
-    const box = document.createElement("div");
+    const box = document.createElement("section");
     box.className = "scores";
-    const title = document.createElement("div");
-    title.className = "scores-title";
-    title.textContent = `YOUR BEST LANDINGS · ${MISSION[config].title}`;
+    const title = document.createElement("h3");
+    title.textContent = "Your best landings";
     const list = document.createElement("ol");
     top.forEach((entry: ScoreEntry) => {
       const li = document.createElement("li");
-      const text = document.createElement("span");
-      text.textContent = `${entry.score} pts · ${formatDate(entry.date)}`;
+      const score = document.createElement("span");
+      score.className = "scores-points";
+      score.textContent = entry.score.toLocaleString("en-US");
+      const date = document.createElement("span");
+      date.className = "scores-date";
+      date.textContent = formatDate(entry.date);
       const watch = document.createElement("button");
       watch.type = "button";
+      watch.className = "quiet";
       watch.textContent = "Watch";
       watch.setAttribute("aria-label", `Watch the ${entry.score}-point landing`);
       watch.addEventListener("click", () => this.watch(entry.replay));
-      li.append(text, watch);
+      li.append(score, date, watch);
       list.append(li);
     });
     box.append(title, list);
@@ -710,63 +669,66 @@ class App {
   private showReady(): void {
     const sim = this.sim;
     if (sim === null) return;
-    const info = sim.info;
     const touch = document.body.classList.contains("touch-mode");
-    const lines = [
-      MISSION[sim.config].blurb,
-      `Land on the pad with the legs moving slower than ${info.max_vertical_speed} m/s down and ${info.max_horizontal_speed} m/s sideways, tilt under ${Math.round(info.max_tilt / DEG)}°.`,
-    ];
-    if (touch) lines.push("Drag the throttle bar on the right; hold the arrow buttons to steer.");
-    this.showCard(
-      MISSION[sim.config].title,
-      lines,
-      [
-        ["Launch (Space)", () => this.run()],
-        ["Watch autopilot", () => this.newRun(sim.config, sim.seed, true)],
+    const s = sim.state;
+    this.showCard({
+      title: MISSION[sim.config].title,
+      lead: MISSION[sim.config].blurb,
+      stats: limitStats(sim.info, s.ignitions_left, s.engine_on > 0.5),
+      actions: [
+        ["Launch", () => this.run()],
+        ["Watch autopilot", () => this.watchAutopilot()],
         ["Main menu", () => this.showMenu()],
       ],
-      undefined,
-      undefined,
-      this.scoreTable(sim.config),
-    );
+      extra: this.scoreTable(sim.config),
+      hint: touch ? "Drag the throttle bar on the right and hold the arrows to steer." : "Space launches",
+    });
   }
 
-  private showCard(
-    title: string,
-    lines: string[],
-    actions: Action[],
-    hint?: string,
-    tone?: "success" | "failure",
-    extra?: HTMLElement | null,
-  ): void {
+  private showCard(o: CardOptions): void {
     const h = document.createElement("h2");
     h.id = "overlay-title";
-    h.textContent = title;
+    h.textContent = o.title;
     const children: HTMLElement[] = [h];
-    for (const line of lines) {
+    if (o.hero) {
+      const hero = document.createElement("p");
+      hero.className = "card-hero";
+      const value = document.createElement("span");
+      value.className = "card-hero-value";
+      value.textContent = o.hero.value;
+      const label = document.createElement("span");
+      label.className = "card-hero-label";
+      label.textContent = o.hero.label;
+      hero.append(value, label);
+      children.push(hero);
+    }
+    if (o.lead) {
       const p = document.createElement("p");
-      p.textContent = line;
+      p.className = "card-lead";
+      p.textContent = o.lead;
       children.push(p);
     }
+    if (o.stats && o.stats.length > 0) children.push(statGrid(o.stats));
+    if (o.extra) children.push(o.extra);
     const row = document.createElement("div");
     row.className = "card-actions";
-    for (const [label, handler] of actions) {
+    o.actions.forEach(([label, handler], i) => {
       const b = document.createElement("button");
       b.type = "button";
+      b.className = i === 0 ? "primary" : "secondary";
       b.textContent = label;
-      b.addEventListener("click", () => handler(b));
+      b.addEventListener("click", () => handler());
       row.append(b);
-    }
+    });
     children.push(row);
-    if (extra) children.push(extra);
-    if (hint) {
+    if (o.hint) {
       const p = document.createElement("p");
-      p.className = "hint";
-      p.textContent = hint;
+      p.className = "card-hint";
+      p.textContent = o.hint;
       children.push(p);
     }
     this.card.replaceChildren(...children);
-    if (tone) this.card.dataset["tone"] = tone;
+    if (o.tone) this.card.dataset["tone"] = o.tone;
     else delete this.card.dataset["tone"];
     this.overlay.hidden = false;
     row.querySelector("button")?.focus({ preventScroll: true });
@@ -784,7 +746,7 @@ class App {
     this.failed = true;
     this.loop.stop();
     this.sound.silence();
-    this.showCard("SIMULATION ERROR", [String(error)], [["Reload", () => window.location.reload()]]);
+    this.showCard({ title: "Simulation error", lead: String(error), actions: [["Reload", () => window.location.reload()]] });
   }
 }
 

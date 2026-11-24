@@ -5,8 +5,8 @@ import { type InputState, Q_MAX } from "./controls";
 
 /** Buttons that act like holding a key. */
 const HOLD_BUTTONS = [
-  ["◀ GIMBAL", "ArrowLeft", "Lean left (gimbal)"],
-  ["GIMBAL ▶", "ArrowRight", "Lean right (gimbal)"],
+  ["◀ Lean", "ArrowLeft", "Lean left (gimbal)"],
+  ["Lean ▶", "ArrowRight", "Lean right (gimbal)"],
   ["↺ RCS", "KeyQ", "Rotate counter-clockwise (RCS)"],
   ["RCS ↻", "KeyE", "Rotate clockwise (RCS)"],
 ] as const;
@@ -25,7 +25,7 @@ export class TouchControls {
     throttle.className = "touch-throttle";
     const label = document.createElement("span");
     label.className = "touch-label";
-    label.textContent = "THROTTLE";
+    label.textContent = "Throttle";
     // A pointer-driven slider (not an <input>: a focused input would swallow
     // the keyboard controls). Drag anywhere on the track, bottom = 0.
     const track = document.createElement("div");
@@ -52,7 +52,7 @@ export class TouchControls {
     track.addEventListener("pointercancel", stop);
     track.addEventListener("lostpointercapture", stop);
 
-    const cut = this.button("CUT", "Cut the engine off", "touch-cut");
+    const cut = this.button("Cut", "Cut the engine off", "touch-cut");
     // CUT bypasses the minimum-throttle floor, exactly like the X key.
     cut.addEventListener("click", () => {
       this.input().press("KeyX");

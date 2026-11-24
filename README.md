@@ -41,7 +41,7 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
   - Deterministic replays (seed + quantized per-tick inputs, RLE + base64url), hardened against untrusted input.
 - **`icarus-wasm`**: wasm-bindgen bindings (about 125 KB of `.wasm`).
 - **`icarus-py`**: the `icarus` Python module (abi3, Python 3.11+).
-- **`web/`**: Vite + TypeScript + Canvas page where you land by hand. It has a fixed 60 Hz timestep independent of the display rate, a compact mission-control HUD, and an end card that says exactly what failed ("too fast: 4.2 m/s down, max 3.0").
+- **`web/`**: Vite + TypeScript + Canvas page where you land by hand. It has a fixed 60 Hz timestep independent of the display rate, a webcast-style HUD with large readouts, and a debrief that shows each touchdown value against its limit and how to fix what failed.
 - **`parity/`**: golden trajectories (hex `f64` bit patterns + FNV-1a hash of every tick). They are checked against native Rust, the Python module and WebAssembly.
 
 ## Determinism, in one paragraph

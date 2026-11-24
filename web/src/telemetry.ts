@@ -21,13 +21,13 @@ interface Panel {
 }
 
 const PANELS: readonly Panel[] = [
-  { title: "ALTITUDE", unit: "m", color: "#5fd4ff", value: (t) => Math.max(0, t.clearance) },
-  { title: "VERTICAL SPEED", unit: "m/s", color: "#f2b35c", value: (t) => t.contact_vy },
-  { title: "THRUST", unit: "%", color: "#ff8a5c", value: (t) => t.thrust_fraction * 100 },
+  { title: "Altitude", unit: "m", color: "#f2f0ea", value: (t) => Math.max(0, t.clearance) },
+  { title: "Vertical speed", unit: "m/s", color: "#f6c453", value: (t) => t.contact_vy },
+  { title: "Thrust", unit: "%", color: "#ff9447", value: (t) => t.thrust_fraction * 100 },
   {
-    title: "TILT",
+    title: "Tilt",
     unit: "°",
-    color: "#50e696",
+    color: "#4fd69c",
     value: (t) => Math.atan2(Math.sin(t.theta), Math.cos(t.theta)) * RAD_TO_DEG,
   },
 ];
@@ -54,8 +54,8 @@ export class TelemetryCharts {
             cursor: { show: false },
             scales: { x: { time: false } },
             axes: [
-              { stroke: "#8494b0", grid: { stroke: "rgba(110,150,220,0.12)" }, size: 22, font: "10px monospace" },
-              { stroke: "#8494b0", grid: { stroke: "rgba(110,150,220,0.12)" }, size: 42, font: "10px monospace" },
+              { stroke: "#9aa6bd", grid: { stroke: "rgba(226,232,244,0.08)" }, size: 22, font: "12px Barlow, sans-serif" },
+              { stroke: "#9aa6bd", grid: { stroke: "rgba(226,232,244,0.08)" }, size: 42, font: "12px Barlow, sans-serif" },
             ],
             series: [{}, { stroke: panel.color, width: 1.5, points: { show: false } }],
           },

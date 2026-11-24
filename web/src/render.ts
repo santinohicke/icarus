@@ -27,10 +27,10 @@ interface Pose {
 }
 
 const COLORS = {
-  skyTop: "#04070f",
-  skyBottom: "#0b1730",
-  grid: "rgba(120, 160, 220, 0.10)",
-  gridLabel: "rgba(160, 190, 235, 0.55)",
+  skyTop: "#070d1c",
+  skyBottom: "#13213d",
+  grid: "rgba(226, 232, 244, 0.07)",
+  gridLabel: "rgba(226, 232, 244, 0.5)",
   sea: "#06101f",
   seaLine: "rgba(90, 140, 210, 0.35)",
   deck: "#2a3446",
@@ -41,7 +41,7 @@ const COLORS = {
   band: "#1b2230",
   leg: "#9aa6b8",
   fin: "#59647a",
-  velocity: "#5fd4ff",
+  velocity: "rgba(242, 240, 234, 0.85)",
   streak: "rgba(170, 200, 255, 0.35)",
 } as const;
 
@@ -180,8 +180,10 @@ export class Renderer {
     ctx.strokeStyle = COLORS.grid;
     ctx.fillStyle = COLORS.gridLabel;
     ctx.lineWidth = 1;
-    ctx.font = "11px ui-monospace, SFMono-Regular, Consolas, monospace";
+    ctx.font = '500 13px "Barlow Condensed", system-ui, sans-serif';
     ctx.textBaseline = "bottom";
+    // Labels on the right edge: the HUD panel covers the left one.
+    ctx.textAlign = "right";
     for (let y = Math.ceil(Math.max(cam.bottom, 0) / step) * step; y <= top; y += step) {
       if (y === 0) continue;
       const py = Math.round(this.sy(cam, y)) + 0.5;
@@ -189,8 +191,9 @@ export class Renderer {
       ctx.moveTo(0, py);
       ctx.lineTo(this.width, py);
       ctx.stroke();
-      ctx.fillText(`${y} m`, 8, py - 2);
+      ctx.fillText(`${y} m`, this.width - 10, py - 2);
     }
+    ctx.textAlign = "left";
     const left = cam.cx - this.width / 2 / cam.scale;
     const right = cam.cx + this.width / 2 / cam.scale;
     for (let x = Math.ceil(left / step) * step; x <= right; x += step) {
@@ -277,7 +280,7 @@ export class Renderer {
     const py = this.sy(cam, p.y);
 
     if (enlarge > 1) {
-      ctx.strokeStyle = "rgba(95, 212, 255, 0.45)";
+      ctx.strokeStyle = "rgba(242, 240, 234, 0.4)";
       ctx.setLineDash([3, 4]);
       ctx.beginPath();
       ctx.arc(px, py, MIN_ROCKET_PX * 0.75, 0, Math.PI * 2);
