@@ -91,13 +91,17 @@ function pilot(t: Rec, info: Rec, input: InputState, realistic: boolean): void {
   hold(input, "KeyE", err < -0.004);
 }
 
-function fly(config: "easy" | "realistic", seed: bigint): string {
+type Level = "training" | "easy" | "crosswind" | "realistic" | "storm" | "engine_out";
+/** Vehicles that cannot hover need the hoverslam pilot. */
+const HOVERSLAM = new Set<Level>(["realistic", "storm", "engine_out"]);
+
+function fly(config: Level, seed: bigint): string {
   const sim = new WasmSim(config, seed);
   const info = rec(sim.vehicleInfo(), iIndex);
   const input = new InputState(info["initial_throttle_level"] ?? 0, minRunningLevel(info["throttle_cutoff"] ?? -0.9));
   let code = 0;
   for (let i = 0; i < 7200 && code === 0; i += 1) {
-    pilot(rec(sim.telemetry(), tIndex), info, input, config === "realistic");
+    pilot(rec(sim.telemetry(), tIndex), info, input, HOVERSLAM.has(config));
     const [th, g, r] = input.sample();
     code = sim.step(th, g, r);
   }
@@ -113,7 +117,17 @@ function fly(config: "easy" | "realistic", seed: bigint): string {
 }
 
 describe("keyboard-only autopilot", () => {
-  for (const config of ["easy", "realistic"] as const) {
+  // Regression floors (of 20 seeds) for a crude bang-bang pilot, not targets:
+  // a competent human does better. The later levels are meant to be hard.
+  const FLOORS: Record<Level, number> = {
+    training: 18,
+    easy: 16,
+    crosswind: 13,
+    realistic: 10,
+    storm: 6,
+    engine_out: 6,
+  };
+  for (const config of Object.keys(FLOORS) as Level[]) {
     it(`lands the ${config} vehicle on most seeds`, () => {
       const results: string[] = [];
       for (let s = 0n; s < 20n; s += 1n) results.push(fly(config, s));
@@ -123,9 +137,7 @@ describe("keyboard-only autopilot", () => {
         return acc;
       }, {});
       console.log(config, summary);
-      // Regression floors for a crude bang-bang pilot, not targets: a
-      // competent human does better. Realistic is meant to be hard.
-      expect(landed).toBeGreaterThanOrEqual(config === "easy" ? 16 : 10);
+      expect(landed).toBeGreaterThanOrEqual(FLOORS[config]);
     });
   }
 });

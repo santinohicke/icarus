@@ -22,6 +22,8 @@ export interface MenuLevel {
   title: string;
   subtitle: string;
   best: number | null;
+  /** Why the level is locked, or null if it can be played. */
+  locked: string | null;
 }
 
 function svg<K extends keyof SVGElementTagNameMap>(
@@ -279,9 +281,18 @@ export class MainMenu {
       const index = html("span", "menu-index", String(i + 1).padStart(2, "0"));
       const text = html("span", "menu-text");
       text.append(html("span", "menu-level-title", level.title), html("span", "menu-level-sub", level.subtitle));
-      if (level.best !== null) text.append(html("span", "menu-level-best", `BEST ${level.best} PTS`));
+      if (level.locked !== null) {
+        text.append(html("span", "menu-level-locked", level.locked));
+        // aria-disabled (not disabled) keeps it focusable, so the unlock hint is announced.
+        b.setAttribute("aria-disabled", "true");
+        b.classList.add("locked");
+      } else if (level.best !== null) {
+        text.append(html("span", "menu-level-best", `BEST ${level.best} PTS`));
+      }
       b.append(line, index, text);
-      b.addEventListener("click", () => this.onPick(level.config));
+      b.addEventListener("click", () => {
+        if (level.locked === null) this.onPick(level.config);
+      });
       b.addEventListener("mouseenter", () => b.focus({ preventScroll: true }));
       return b;
     });
@@ -289,7 +300,9 @@ export class MainMenu {
     this.root.hidden = false;
     this.shownAt = performance.now();
     this.lastTime = null;
-    items[0]?.focus({ preventScroll: true });
+    // Focus the furthest level the player can fly.
+    const playable = items.filter((b) => !b.classList.contains("locked"));
+    playable[playable.length - 1]?.focus({ preventScroll: true });
     if (this.frame === null) this.frame = requestAnimationFrame((t) => this.animate(t));
   }
 

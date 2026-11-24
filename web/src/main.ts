@@ -9,6 +9,7 @@ import { Renderer } from "./render";
 import { ScoreBoard, type ScoreEntry, browserStore } from "./scores";
 import { replayFromHash, replayUrl, scenarioUrl } from "./share";
 import {
+  CONFIGS,
   type Config,
   type FlightView,
   ReplayPlayer,
@@ -31,10 +32,22 @@ const REPLAY_SPEEDS = [1, 2, 4] as const;
 const CRASH_CODES = new Set([2, 3, 4, 5, 6, 7]);
 
 const MISSION: Record<Config, { title: string; subtitle: string; blurb: string }> = {
+  training: {
+    title: "TRAINING",
+    subtitle: "LOW · SLOW · CALM AIR",
+    blurb:
+      "Your first landing. The engine is running and can throttle below the stage's weight, so you can hover. Low altitude, almost no wind, a wide pad.",
+  },
   easy: {
     title: "EASY",
     subtitle: "HOVER-CAPABLE · 3 RELIGHTS",
     blurb: "Engine running, 3 relights. The engine can throttle below the stage's weight, so you can hover.",
+  },
+  crosswind: {
+    title: "CROSSWIND",
+    subtitle: "STRONG WIND · GUSTS · NARROW PAD",
+    blurb:
+      "The same hover-capable stage, but in strong wind with frequent gusts, starting further away from a narrower pad. Lean into the wind.",
   },
   realistic: {
     title: "REALISTIC",
@@ -42,7 +55,58 @@ const MISSION: Record<Config, { title: string; subtitle: string; blurb: string }
     blurb:
       "Engine off, one ignition. Even at minimum throttle the engine is stronger than the stage's weight: you cannot hover. Light it at the right altitude and land in a single burn.",
   },
+  storm: {
+    title: "STORM",
+    subtitle: "HOVERSLAM · GALE · LAGGY SENSORS",
+    blurb:
+      "A hoverslam in a storm: very strong wind and gusts, and sensors that lag twice as much. One ignition, no hovering.",
+  },
+  engine_out: {
+    title: "ENGINE OUT",
+    subtitle: "HOVERSLAM · SOMETHING WILL FAIL",
+    blurb:
+      "A hoverslam where something always breaks during the descent: the gimbal jams (cancel the spin with RCS, Q/E) or the engine loses thrust (light it earlier).",
+  },
 };
+
+const UNLOCK_KEY = "icarus.landed.v1";
+
+/**
+ * Levels landed at least once. Kept apart from the scores (which are tied to
+ * the physics version) and also in memory, so unlocks work without storage.
+ */
+class Progress {
+  private readonly landed = new Set<Config>();
+
+  constructor() {
+    try {
+      const parsed: unknown = JSON.parse(window.localStorage.getItem(UNLOCK_KEY) ?? "[]");
+      if (Array.isArray(parsed)) for (const c of parsed) if (isConfig(c)) this.landed.add(c);
+    } catch {
+      // storage unavailable or corrupt: start from nothing
+    }
+  }
+
+  has(config: Config): boolean {
+    return this.landed.has(config);
+  }
+
+  add(config: Config): void {
+    this.landed.add(config);
+    try {
+      window.localStorage.setItem(UNLOCK_KEY, JSON.stringify([...this.landed]));
+    } catch {
+      // keep the in-memory unlock
+    }
+  }
+}
+
+/** Level i is unlocked once level i − 1 has been landed. */
+function unlocked(index: number, landed: (config: Config) => boolean): boolean {
+  if (index === 0) return true;
+  const previous = CONFIGS[index - 1];
+  return previous !== undefined && landed(previous);
+}
 
 const OUTCOME_TEXT: Record<string, string> = {
   landed: "Touchdown confirmed",
@@ -114,6 +178,7 @@ class App {
   private readonly touch: TouchControls;
   private readonly menu: MainMenu;
   private readonly sound = new Sound();
+  private readonly progress = new Progress();
   private readonly scores = new ScoreBoard(browserStore(), getPhysicsVersion());
   private readonly loop: FixedLoop;
   private readonly overlay = byId("overlay", HTMLDivElement);
@@ -276,12 +341,16 @@ class App {
     this.hideOverlay();
     this.updateChrome();
     window.history.replaceState(null, "", new URL(window.location.pathname, window.location.href));
+    const landed = (config: Config): boolean => this.progress.has(config) || this.scores.best(config) !== null;
     this.menu.show(
-      (["easy", "realistic"] as const).map((config) => ({
+      CONFIGS.map((config, i) => ({
         config,
         title: MISSION[config].title,
         subtitle: MISSION[config].subtitle,
         best: this.scores.best(config),
+        locked: !unlocked(i, landed)
+          ? `LAND ${MISSION[CONFIGS[i - 1] ?? config].title} TO UNLOCK`
+          : null,
       })),
     );
   }
@@ -494,6 +563,7 @@ class App {
     } catch (error) {
       console.error(error);
     }
+    if (landed) this.progress.add(sim.config);
     if (landed && replay !== null) {
       const rank = this.scores.add({
         config: sim.config,
@@ -503,8 +573,8 @@ class App {
         replay,
         physics: getPhysicsVersion(),
       });
-      if (rank === 1) lines.push(`New personal best on ${sim.config}!`);
-      else if (rank !== null) lines.push(`#${rank} on your ${sim.config} leaderboard.`);
+      if (rank === 1) lines.push(`New personal best on ${MISSION[sim.config].title}!`);
+      else if (rank !== null) lines.push(`#${rank} on your ${MISSION[sim.config].title} leaderboard.`);
       this.updateChrome();
     }
     const actions: Action[] = [
@@ -546,7 +616,7 @@ class App {
     box.className = "scores";
     const title = document.createElement("div");
     title.className = "scores-title";
-    title.textContent = `YOUR BEST LANDINGS · ${config.toUpperCase()}`;
+    title.textContent = `YOUR BEST LANDINGS · ${MISSION[config].title}`;
     const list = document.createElement("ol");
     top.forEach((entry: ScoreEntry) => {
       const li = document.createElement("li");
@@ -575,7 +645,7 @@ class App {
     ];
     if (touch) lines.push("Drag the throttle bar on the right; hold the arrow buttons to steer.");
     this.showCard(
-      `${MISSION[sim.config].title} · ${sim.config === "easy" ? "HOVER-CAPABLE" : "HOVERSLAM"}`,
+      MISSION[sim.config].title,
       lines,
       [
         ["Launch (Space)", () => this.run()],

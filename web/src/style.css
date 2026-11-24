@@ -538,8 +538,11 @@ body[data-phase="menu"] #view {
 .menu-panel {
   position: absolute;
   left: clamp(24px, 6vw, 80px);
-  top: clamp(32px, 9vh, 96px);
+  top: clamp(24px, 7vh, 96px);
   max-width: calc(100% - 48px);
+  /* Short screens (landscape phones): the panel scrolls above the footer. */
+  max-height: calc(100% - 70px);
+  overflow-y: auto;
 }
 
 .menu-title {
@@ -560,14 +563,26 @@ body[data-phase="menu"] #view {
 .menu-rule {
   width: 40px;
   height: 1px;
-  margin: 18px 0 28px;
+  margin: 14px 0 18px;
   background: #8a919b;
 }
 
 .menu-levels {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 300px));
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
+  gap: 4px 36px;
+  align-items: start;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+@media (max-width: 560px) {
+  .menu-levels {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
 }
 
 .menu-item {
@@ -624,8 +639,34 @@ body[data-phase="menu"] #view {
 }
 
 .menu-level-title {
-  font-size: clamp(22px, 3.4vw, 34px);
+  font-size: clamp(18px, 2.6vw, 26px);
   letter-spacing: 0.25em;
+}
+
+.menu-item.locked:hover .menu-line,
+.menu-item.locked:focus .menu-line {
+  width: 0;
+}
+
+.menu-item.locked {
+  cursor: default;
+  color: #59616d;
+}
+
+.menu-level .menu-index {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.menu-item.locked .menu-index,
+.menu-item.locked .menu-level-sub {
+  color: #474e58;
+}
+
+.menu-level-locked {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #8a919b;
 }
 
 .menu-level-sub {
@@ -641,7 +682,7 @@ body[data-phase="menu"] #view {
 }
 
 .menu-small {
-  margin-top: 26px;
+  margin-top: 18px;
   padding-left: 44px;
   font-size: 11px;
 }

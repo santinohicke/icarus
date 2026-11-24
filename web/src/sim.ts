@@ -9,7 +9,8 @@ import init, {
   vehicleInfoFields,
 } from "./wasm/icarus_wasm.js";
 
-export const CONFIGS = ["easy", "realistic"] as const;
+/** Every level, in campaign order (easiest first). */
+export const CONFIGS = ["training", "easy", "crosswind", "realistic", "storm", "engine_out"] as const;
 export type Config = (typeof CONFIGS)[number];
 
 export function isConfig(value: unknown): value is Config {
