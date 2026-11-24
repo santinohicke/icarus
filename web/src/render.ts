@@ -180,7 +180,7 @@ export class Renderer {
     ctx.strokeStyle = COLORS.grid;
     ctx.fillStyle = COLORS.gridLabel;
     ctx.lineWidth = 1;
-    ctx.font = '500 13px "Barlow Condensed", system-ui, sans-serif';
+    ctx.font = '500 11px "JetBrains Mono", ui-monospace, monospace';
     ctx.textBaseline = "bottom";
     // Labels on the right edge: the HUD panel covers the left one.
     ctx.textAlign = "right";

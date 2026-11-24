@@ -245,7 +245,7 @@ export class MainMenu {
 
     const panel = html("div", "menu-panel");
     const title = html("h1", "menu-title", "Icarus");
-    const tagline = html("p", "menu-tagline", "Land the rocket");
+    const tagline = html("p", "menu-tagline", "Just land the rocket");
     this.list = html("nav", "menu-levels");
     this.list.setAttribute("aria-label", "Choose a mission");
     panel.append(title, tagline, this.list);

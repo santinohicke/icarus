@@ -54,8 +54,8 @@ export class TelemetryCharts {
             cursor: { show: false },
             scales: { x: { time: false } },
             axes: [
-              { stroke: "#9aa6bd", grid: { stroke: "rgba(226,232,244,0.08)" }, size: 22, font: "12px Barlow, sans-serif" },
-              { stroke: "#9aa6bd", grid: { stroke: "rgba(226,232,244,0.08)" }, size: 42, font: "12px Barlow, sans-serif" },
+              { stroke: "#9aa6bd", grid: { stroke: "rgba(226,232,244,0.08)" }, size: 22, font: "10px \"JetBrains Mono\", monospace" },
+              { stroke: "#9aa6bd", grid: { stroke: "rgba(226,232,244,0.08)" }, size: 42, font: "10px \"JetBrains Mono\", monospace" },
             ],
             series: [{}, { stroke: panel.color, width: 1.5, points: { show: false } }],
           },

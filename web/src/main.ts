@@ -1,11 +1,9 @@
 // Icarus web front-end: main menu, manual landing, replays and local scores.
 
-import "@fontsource/barlow/400.css";
-import "@fontsource/barlow/500.css";
-import "@fontsource/barlow/600.css";
-import "@fontsource/barlow-condensed/500.css";
-import "@fontsource/barlow-condensed/600.css";
-import "@fontsource/barlow-condensed/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+import "@fontsource/jetbrains-mono/700.css";
+import "@fontsource/jetbrains-mono/800.css";
 
 import { Sound } from "./audio";
 import { KeyboardControls, Q_CENTER, minRunningLevel } from "./controls";
@@ -14,7 +12,7 @@ import { Hud } from "./hud";
 import { FixedLoop } from "./loop";
 import { MainMenu } from "./menu";
 import { Renderer } from "./render";
-import { ScoreBoard, type ScoreEntry, browserStore } from "./scores";
+import { ScoreBoard, browserStore } from "./scores";
 import { replayFromHash, replayUrl, scenarioUrl } from "./share";
 import {
   Autopilot,
@@ -135,11 +133,8 @@ function targetsControl(target: EventTarget | null, code: string): boolean {
   return pressKey && (target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement);
 }
 
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-type Action = [label: string, handler: () => void];
+/** A card button: label, handler and an optional key shown beside the label. */
+type Action = [label: string, handler: () => void, key?: string | undefined];
 
 interface CardOptions {
   title: string;
@@ -151,7 +146,7 @@ interface CardOptions {
   actions: readonly Action[];
   extra?: HTMLElement | null;
   /** Keyboard hint at the bottom, e.g. "Space launches". */
-  hint?: string;
+  hint?: string | undefined;
 }
 
 class App {
@@ -353,10 +348,16 @@ class App {
     );
   }
 
+  /** Retry: the same scenario again, straight into the flight (no briefing). */
   private restart(): void {
     if (this.mode === "replay") this.replayAgain();
     else if (this.mode === "auto") this.watchAutopilot();
-    else this.newRun(this.lastScenario.config, this.lastScenario.seed);
+    else this.newRun(this.lastScenario.config, this.lastScenario.seed, false, true);
+  }
+
+  /** A new scenario of the current level, straight into the flight. */
+  private newScenario(): void {
+    this.newRun(this.lastScenario.config, randomSeed(), false, true);
   }
 
   /**
@@ -367,8 +368,11 @@ class App {
     this.newRun(this.lastScenario.config, randomSeed(), true);
   }
 
-  /** A new run of `config` with `seed`, flown by the player or (auto) the autopilot. */
-  private newRun(config: Config, seed: bigint, auto = false): void {
+  /**
+   * A new run of `config` with `seed`, flown by the player or (auto) the
+   * autopilot. `launch` skips the briefing and starts flying at once.
+   */
+  private newRun(config: Config, seed: bigint, auto = false, launch = false): void {
     this.menu.hide();
     this.disposeFlights();
     const sim = new Simulation(config, seed);
@@ -387,7 +391,7 @@ class App {
     this.setPhase("ready");
     this.updateChrome();
     window.history.replaceState(null, "", scenarioUrl(window.location.href, config, seed));
-    if (auto) this.run();
+    if (auto || launch) this.run();
     else this.showReady();
   }
 
@@ -484,16 +488,16 @@ class App {
     this.setPhase("paused");
     this.controls.input.clearPending();
     this.updateChrome();
-    const actions: Action[] = [["Resume", () => this.run()]];
+    const actions: Action[] = [["Resume", () => this.run(), "Esc"]];
     if (this.mode === "fly") {
-      actions.push(["Retry", () => this.restart()], ["New scenario", () => this.newRun(this.lastScenario.config, randomSeed())]);
+      actions.push(["Retry", () => this.restart()], ["New scenario", () => this.newScenario()]);
     } else if (this.mode === "auto") {
       actions.push(["Watch again", () => this.watchAutopilot()], ["Fly it yourself", () => this.flyYourself()]);
     } else {
       actions.push(["Watch again", () => this.replayAgain()]);
     }
     actions.push(["Main menu", () => this.showMenu()]);
-    this.showCard({ title: "Paused", actions, hint: "Esc resumes" });
+    this.showCard({ title: "Paused", actions });
   }
 
   private togglePause(): void {
@@ -624,46 +628,16 @@ class App {
       ...debrief,
       hero,
       actions: [
-        ["Retry", () => this.restart()],
-        ["New scenario", () => this.newRun(sim.config, randomSeed())],
+        ["Retry", () => this.restart(), "Space"],
+        ["New scenario", () => this.newScenario()],
         ["Main menu", () => this.showMenu()],
       ],
-      hint: "Space retries",
     });
   }
 
   /** The same scenario, flown by the player. */
   private flyYourself(): void {
     this.newRun(this.lastScenario.config, this.lastScenario.seed);
-  }
-
-  private scoreTable(config: Config): HTMLElement | null {
-    const top = this.scores.top(config, 3);
-    if (top.length === 0) return null;
-    const box = document.createElement("section");
-    box.className = "scores";
-    const title = document.createElement("h3");
-    title.textContent = "Your best landings";
-    const list = document.createElement("ol");
-    top.forEach((entry: ScoreEntry) => {
-      const li = document.createElement("li");
-      const score = document.createElement("span");
-      score.className = "scores-points";
-      score.textContent = entry.score.toLocaleString("en-US");
-      const date = document.createElement("span");
-      date.className = "scores-date";
-      date.textContent = formatDate(entry.date);
-      const watch = document.createElement("button");
-      watch.type = "button";
-      watch.className = "quiet";
-      watch.textContent = "Watch";
-      watch.setAttribute("aria-label", `Watch the ${entry.score}-point landing`);
-      watch.addEventListener("click", () => this.watch(entry.replay));
-      li.append(score, date, watch);
-      list.append(li);
-    });
-    box.append(title, list);
-    return box;
   }
 
   private showReady(): void {
@@ -676,12 +650,11 @@ class App {
       lead: MISSION[sim.config].blurb,
       stats: limitStats(sim.info, s.ignitions_left, s.engine_on > 0.5),
       actions: [
-        ["Launch", () => this.run()],
+        ["Launch", () => this.run(), touch ? undefined : "Space"],
         ["Watch autopilot", () => this.watchAutopilot()],
         ["Main menu", () => this.showMenu()],
       ],
-      extra: this.scoreTable(sim.config),
-      hint: touch ? "Drag the throttle bar on the right and hold the arrows to steer." : "Space launches",
+      hint: touch ? "Drag the throttle bar on the right and hold the arrows to steer." : undefined,
     });
   }
 
@@ -712,11 +685,17 @@ class App {
     if (o.extra) children.push(o.extra);
     const row = document.createElement("div");
     row.className = "card-actions";
-    o.actions.forEach(([label, handler], i) => {
+    o.actions.forEach(([label, handler, key], i) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = i === 0 ? "primary" : "secondary";
       b.textContent = label;
+      if (key !== undefined) {
+        const k = document.createElement("kbd");
+        k.textContent = key;
+        k.setAttribute("aria-hidden", "true");
+        b.append(k);
+      }
       b.addEventListener("click", () => handler());
       row.append(b);
     });

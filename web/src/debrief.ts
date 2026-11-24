@@ -77,15 +77,28 @@ function speedStat(label: string, v: number, limit: number): Stat {
   };
 }
 
-/** The numbers the judge looks at, at the end of a flight. */
+/**
+ * The numbers the judge looks at, at the end of a flight: the three touchdown
+ * limits, then the miss distance if a leg missed the pad, else the fuel left.
+ */
 export function flightStats(s: Telemetry, info: VehicleInfo): Stat[] {
   const tilt = Math.abs(Math.atan2(Math.sin(s.theta), Math.cos(s.theta)));
   const maxTilt = info.max_tilt;
   const miss = Math.max(0, -s.pad_margin);
   const fuel = info.initial_propellant > 0 ? Math.max(0, s.propellant / info.initial_propellant) : 0;
+  const last: Stat =
+    miss > 0
+      ? { label: "Off the pad", value: miss.toFixed(1), unit: "m", note: "a leg missed", state: "bad" }
+      : {
+          label: "Fuel left",
+          value: `${Math.round(fuel * 100)}`,
+          unit: "%",
+          note: `${Math.round(s.propellant).toLocaleString("en-US")} kg`,
+          fill: Math.min(1, fuel),
+        };
   return [
-    speedStat("Descent speed", s.contact_vy, info.max_vertical_speed),
-    speedStat("Sideways speed", s.contact_vx, info.max_horizontal_speed),
+    speedStat("Descent", s.contact_vy, info.max_vertical_speed),
+    speedStat("Sideways", s.contact_vx, info.max_horizontal_speed),
     {
       label: "Tilt",
       value: (tilt * RAD_TO_DEG).toFixed(1),
@@ -95,31 +108,17 @@ export function flightStats(s: Telemetry, info: VehicleInfo): Stat[] {
       fill: Math.min(1, tilt / (2 * maxTilt)),
       mark: 0.5,
     },
-    {
-      label: "Off the pad",
-      value: miss.toFixed(1),
-      unit: "m",
-      note: miss === 0 ? "both legs on the pad" : "a leg missed the pad",
-      state: miss === 0 ? "ok" : "bad",
-    },
-    {
-      label: "Fuel left",
-      value: Math.round(s.propellant).toLocaleString("en-US"),
-      unit: "kg",
-      note: `${Math.round(fuel * 100)}% of the load`,
-      fill: Math.min(1, fuel),
-    },
-    { label: "Flight time", value: s.time.toFixed(1), unit: "s" },
+    last,
   ];
 }
 
 /** Touchdown limits for the briefing. */
 export function limitStats(info: VehicleInfo, ignitions: number, engineOn: boolean): Stat[] {
   return [
-    { label: "Descent speed", value: `${info.max_vertical_speed}`, unit: "m/s", note: "at most" },
-    { label: "Sideways speed", value: `${info.max_horizontal_speed}`, unit: "m/s", note: "at most" },
-    { label: "Tilt", value: `${Math.round(info.max_tilt * RAD_TO_DEG)}`, unit: "°", note: "at most" },
-    { label: "Engine", value: engineOn ? "On" : "Off", note: `${ignitions} ignition${ignitions === 1 ? "" : "s"} left` },
+    { label: "Descent", value: `≤ ${info.max_vertical_speed}`, unit: "m/s" },
+    { label: "Sideways", value: `≤ ${info.max_horizontal_speed}`, unit: "m/s" },
+    { label: "Tilt", value: `≤ ${Math.round(info.max_tilt * RAD_TO_DEG)}`, unit: "°" },
+    { label: "Engine", value: engineOn ? "On" : "Off", note: `${ignitions} ignition${ignitions === 1 ? "" : "s"}` },
   ];
 }
 

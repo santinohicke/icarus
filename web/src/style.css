@@ -1,6 +1,6 @@
-/* Icarus: a launch-webcast look. White type and big condensed numbers over
-   the night flight; colour only where it means something (engine plume,
-   go / caution / abort). Barlow is self-hosted (see main.ts imports). */
+/* Icarus: flight-console look. One bold technical monospace (JetBrains
+   Mono, self-hosted, see main.ts imports) over the night flight; colour only
+   where it means something (engine plume, go / caution / abort). */
 
 :root {
   --sky: #0b1426;
@@ -16,8 +16,8 @@
   --caution: #f6c453;
   --abort: #ff6b5b;
   --plume: #ff9447;
-  --text: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --display: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+  --text: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --display: var(--text);
   color-scheme: dark;
 }
 
@@ -33,7 +33,7 @@ body {
   overflow: hidden;
   background: var(--sky);
   color: var(--ink);
-  font: 400 15px/1.45 var(--text);
+  font: 400 14px/1.45 var(--text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -46,7 +46,7 @@ body {
 /* --- Buttons ------------------------------------------------------------- */
 
 button {
-  font: 500 14px/1 var(--text);
+  font: 700 13px/1 var(--text);
   color: var(--ink);
   background: transparent;
   border: 1px solid var(--line-strong);
@@ -69,10 +69,28 @@ button:focus-visible {
 }
 
 button.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   background: var(--ink);
   border-color: var(--ink);
   color: var(--sky);
-  font-weight: 600;
+  font-weight: 800;
+}
+
+/* Key hint inside a button ("Launch  Space"). */
+button kbd {
+  height: 20px;
+  margin: -4px -6px -4px 0;
+  font-size: 11px;
+  background: rgba(11, 20, 38, 0.1);
+  border-color: rgba(11, 20, 38, 0.35);
+  color: inherit;
+}
+
+button.secondary kbd {
+  background: rgba(226, 232, 244, 0.08);
+  border-color: var(--line-strong);
 }
 
 button.primary:hover {
@@ -106,20 +124,21 @@ button.quiet:hover {
 }
 
 .brand {
-  font: 700 24px/1 var(--display);
-  letter-spacing: -0.01em;
+  font: 800 18px/1 var(--display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   border: none;
   padding: 4px 2px;
   border-radius: 6px;
 }
 
 .mission {
-  font: 500 17px/1 var(--display);
+  font: 500 13px/1 var(--display);
   color: var(--muted);
 }
 
 .mode-tag {
-  font: 600 12px/1 var(--text);
+  font: 800 11px/1 var(--text);
   color: var(--sky);
   background: var(--ink);
   border-radius: 999px;
@@ -157,7 +176,7 @@ button.quiet:hover {
 
 .best span {
   color: var(--ink);
-  font: 600 16px/1 var(--display);
+  font: 800 14px/1 var(--display);
   margin-left: 4px;
   font-variant-numeric: tabular-nums;
 }
@@ -188,7 +207,7 @@ button.quiet:hover {
 
 .readout-label {
   display: block;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -199,13 +218,13 @@ button.quiet:hover {
 }
 
 .readout-value {
-  font: 600 34px/1.05 var(--display);
+  font: 800 28px/1.1 var(--display);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
 }
 
 .readout-unit {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -228,7 +247,7 @@ button.quiet:hover {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.75;
 }
 
@@ -237,6 +256,7 @@ button.quiet:hover {
 }
 
 .hud-value {
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -290,7 +310,7 @@ button.quiet:hover {
   flex-wrap: wrap;
   gap: 18px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   pointer-events: none;
 }
 
@@ -307,7 +327,7 @@ kbd {
   height: 22px;
   padding: 0 5px;
   margin-right: 3px;
-  font: 600 12px/1 var(--text);
+  font: 700 11px/1 var(--text);
   color: var(--ink);
   background: rgba(226, 232, 244, 0.08);
   border: 1px solid var(--line-strong);
@@ -332,8 +352,8 @@ kbd {
 }
 
 .card {
-  width: min(100%, 540px);
-  padding: 28px 30px 24px;
+  width: min(100%, 520px);
+  padding: 24px 26px 22px;
   background: var(--panel-solid);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -342,8 +362,8 @@ kbd {
 
 .card h2 {
   margin: 0;
-  font: 700 44px/1 var(--display);
-  letter-spacing: -0.015em;
+  font: 800 30px/1.05 var(--display);
+  letter-spacing: -0.03em;
 }
 
 .card[data-tone="success"] h2 {
@@ -358,25 +378,26 @@ kbd {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 10px;
-  margin: 10px 0 0;
+  gap: 4px 8px;
+  margin: 6px 0 0;
 }
 
 .card-hero-value {
-  font: 700 64px/0.95 var(--display);
-  letter-spacing: -0.02em;
+  font: 800 34px/1 var(--display);
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 
 .card-hero-label {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .card-lead {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   max-width: 60ch;
-  font-size: 16px;
+  font-size: 13px;
+  line-height: 1.55;
   color: var(--ink);
 }
 
@@ -384,12 +405,12 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .card-hint {
   margin: 14px 0 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--dim);
 }
 
@@ -397,8 +418,8 @@ kbd {
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr));
-  gap: 0 20px;
-  margin: 22px 0 0;
+  gap: 0 18px;
+  margin: 16px 0 0;
   border-top: 1px solid var(--line);
 }
 
@@ -412,7 +433,7 @@ kbd {
 }
 
 .stat {
-  padding: 12px 0 12px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -422,7 +443,7 @@ kbd {
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -434,13 +455,13 @@ kbd {
 }
 
 .stat-number {
-  font: 600 30px/1.05 var(--display);
+  font: 800 20px/1.1 var(--display);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
 }
 
 .stat-unit {
-  font-size: 14px;
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -455,7 +476,7 @@ kbd {
 .stat-bar {
   position: relative;
   height: 3px;
-  margin-top: 10px;
+  margin-top: 8px;
   background: var(--line);
   border-radius: 2px;
 }
@@ -486,46 +507,9 @@ kbd {
 }
 
 .stat-note {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 5px;
+  font-size: 11px;
   color: var(--dim);
-}
-
-/* Best landings on the briefing card. */
-.scores {
-  margin-top: 20px;
-}
-
-.scores h3 {
-  margin: 0 0 4px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.scores ol {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.scores li {
-  display: grid;
-  grid-template-columns: max-content 1fr max-content;
-  align-items: center;
-  gap: 14px;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.scores-points {
-  font: 600 20px/1 var(--display);
-  font-variant-numeric: tabular-nums;
-}
-
-.scores-date {
-  color: var(--dim);
-  font-size: 13px;
 }
 
 /* --- Telemetry charts ------------------------------------------------------ */
@@ -549,7 +533,7 @@ kbd {
 }
 
 .chart .u-title {
-  font: 500 13px/1.4 var(--text);
+  font: 700 11px/1.4 var(--text);
   color: var(--muted);
   text-align: left;
   padding-left: 4px;
@@ -628,7 +612,7 @@ body.touch-mode .help {
 .touch-cut {
   height: 52px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 12px;
   background: var(--panel);
   touch-action: none;
 }
@@ -647,7 +631,7 @@ body.touch-mode .help {
 }
 
 .touch-label {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -712,7 +696,8 @@ body[data-phase="menu"] #view {
 
 .menu-panel {
   position: absolute;
-  left: clamp(20px, 6vw, 88px);
+  left: clamp(10px, calc(6vw - 10px), 78px);
+  padding-left: 10px;
   top: clamp(24px, 8vh, 104px);
   max-width: calc(100% - 40px);
   /* Short screens (landscape phones): the panel scrolls above the footer. */
@@ -723,19 +708,19 @@ body[data-phase="menu"] #view {
 
 .menu-title {
   margin: 0;
-  font: 700 clamp(64px, 10vw, 120px) / 0.86 var(--display);
-  letter-spacing: -0.03em;
+  font: 800 clamp(48px, 8vw, 96px) / 0.9 var(--display);
+  letter-spacing: -0.05em;
 }
 
 .menu-tagline {
-  margin: 10px 0 0;
-  font-size: clamp(17px, 1.8vw, 20px);
+  margin: 12px 0 0;
+  font-size: clamp(13px, 1.4vw, 16px);
   color: var(--muted);
 }
 
 .menu-levels {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 280px));
+  grid-template-columns: repeat(2, minmax(0, 300px));
   grid-auto-flow: column;
   grid-template-rows: repeat(3, auto);
   gap: 2px 40px;
@@ -750,8 +735,7 @@ body[data-phase="menu"] #view {
     ". status";
   column-gap: 8px;
   align-items: baseline;
-  padding: 8px 10px 8px 6px;
-  margin-left: -6px;
+  padding: 8px 12px 8px 10px;
   border: none;
   border-radius: 10px;
   color: var(--muted);
@@ -766,26 +750,28 @@ body[data-phase="menu"] #view {
 }
 
 .menu-level:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 1px solid var(--line-strong);
   outline-offset: 0;
 }
 
 .menu-index {
   grid-area: index;
-  font: 500 15px/1 var(--display);
+  font: 500 13px/1 var(--display);
   color: var(--dim);
   font-variant-numeric: tabular-nums;
 }
 
 .menu-level-title {
   grid-area: title;
-  font: 600 clamp(26px, 3.2vw, 36px) / 1.05 var(--display);
-  letter-spacing: -0.01em;
+  font: 800 clamp(20px, 2.6vw, 28px) / 1.1 var(--display);
+  letter-spacing: -0.03em;
 }
 
 .menu-level-best {
   grid-area: status;
-  font-size: 14px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--go);
   text-shadow: none;
 }
@@ -818,7 +804,7 @@ body[data-phase="menu"] #view {
 }
 
 .menu-version {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--dim);
 }
 
@@ -890,7 +876,7 @@ body[data-phase="menu"] #view {
   }
 
   .readout-value {
-    font-size: 26px;
+    font-size: 21px;
   }
 
   .hud-list {
@@ -933,11 +919,11 @@ body[data-phase="menu"] #view {
   }
 
   .card h2 {
-    font-size: 36px;
+    font-size: 26px;
   }
 
   .card-hero-value {
-    font-size: 52px;
+    font-size: 30px;
   }
 
   .stats,
@@ -948,7 +934,7 @@ body[data-phase="menu"] #view {
   }
 
   .stat-number {
-    font-size: 26px;
+    font-size: 18px;
   }
 }
 
