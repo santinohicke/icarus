@@ -103,7 +103,20 @@ Both configurations use the same airframe; they differ in engine, starting condi
 | `easy` | PID, LQR around hover, MPC |
 | `realistic` | PID with an ignition trigger, convex guidance + tracking controller, MPC (LQR around hover is not valid, because that equilibrium doesn't exist) |
 
-The web offers both as difficulty levels; development and first training happen on `easy`; the main research results use `realistic`.
+Development and first training happen on `easy`; the main research results use `realistic`.
+
+**Campaign levels.** The web game offers six levels, unlocked in order by landing the previous one. The four extra levels reuse the two vehicles and only change the scenario:
+
+| Level | Vehicle | What changes |
+| --- | --- | --- |
+| `training` | easy | 400–500 m, −25 to −20 m/s, almost no wind, ±30 m offset, 50 m pad half-width |
+| `easy` | easy | As above in the table |
+| `crosswind` | easy | Mean wind up to ±10 m/s, turbulence σ 2.5 m/s, a gust every ~10 s (4–8 m/s), ±150 m offset, 30 m pad half-width |
+| `realistic` | realistic | As above in the table |
+| `storm` | realistic | Mean wind up to ±14 m/s, turbulence σ 3 m/s, a gust every ~8 s (6–12 m/s), 6-tick sensor delay |
+| `engine_out` | realistic | A fault in every episode between 4 and 10 s: a stuck gimbal (0.3–0.8°) or a thrust loss (82–90% left) |
+
+Configuration ids 0 and 1 are unchanged, so earlier replays stay valid.
 
 ### Forces and effects
 
@@ -305,7 +318,7 @@ icarus/
 │   │   │   ├── rng.rs            # SplitMix64 + xoshiro256++, independent streams
 │   │   │   ├── physics/
 │   │   │   │   ├── mod.rs
-│   │   │   │   ├── params.rs     # vehicle parameters, `easy` and `realistic`
+│   │   │   │   ├── params.rs     # vehicle parameters: `easy`, `realistic` and the campaign levels
 │   │   │   │   ├── state.rs      # State, Controls (normalized actions)
 │   │   │   │   ├── dynamics.rs   # forces, torques, derivatives, I(m), CoM(m)
 │   │   │   │   ├── integrator.rs # fixed-step RK4

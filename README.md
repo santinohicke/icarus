@@ -12,7 +12,7 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 
 ## What is in Stage 2 (the web app)
 
-- Main menu: the Earth from orbit with the stage circling it, and the two missions as big menu items.
+- Main menu: the Earth from orbit with the stage circling it, and a six-level campaign (training, easy, crosswind, realistic, storm, engine out), each unlocked by landing the previous one.
 - Quiet synthesized sound effects (engine, RCS, touchdown, explosion), with a mute toggle.
 - White RCS cold-gas jets at the nose, on the side opposite to the push.
 - Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt. Hidden by default.
@@ -29,7 +29,7 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
   - Wind made of a mean, Ornstein–Uhlenbeck turbulence and 1-cosine gusts.
   - Sensor noise and delay, and actuator and engine faults.
   - Exact touchdown detection with leg-tip contact-point velocity, outcomes and score.
-  - Two vehicles: `easy` (can hover) and `realistic` (cannot hover; a hoverslam is required).
+  - Two vehicles: `easy` (can hover) and `realistic` (cannot hover; a hoverslam is required), used by six levels (training, easy, crosswind, realistic, storm, engine out).
   - Deterministic replays (seed + quantized per-tick inputs, RLE + base64url), hardened against untrusted input.
 - **`icarus-wasm`**: wasm-bindgen bindings (about 125 KB of `.wasm`).
 - **`icarus-py`**: the `icarus` Python module (abi3, Python 3.11+).
