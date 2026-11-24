@@ -1,6 +1,7 @@
 // Typed wrapper around the WebAssembly simulation.
 
 import init, {
+  WasmReplay,
   WasmSim,
   outcomeName as wasmOutcomeName,
   physicsVersion,
@@ -104,9 +105,12 @@ let telemetryIndex: Record<TelemetryKey, number> | null = null;
 let infoIndex: Record<InfoKey, number> | null = null;
 let loading: Promise<void> | null = null;
 
-/** Loads and instantiates the WASM module (once). */
-export function loadWasm(): Promise<void> {
-  loading ??= init().then(() => {
+/**
+ * Loads and instantiates the WASM module (once). `bytes` replaces the fetch
+ * of the .wasm file (tests under Node).
+ */
+export function loadWasm(bytes?: BufferSource): Promise<void> {
+  loading ??= (bytes === undefined ? init() : init({ module_or_path: bytes })).then(() => {
     telemetryIndex = indexOf(TELEMETRY_KEYS, telemetryFields());
     infoIndex = indexOf(INFO_KEYS, vehicleInfoFields());
   });
@@ -121,8 +125,27 @@ export function getPhysicsVersion(): number {
   return physicsVersion();
 }
 
+/** What the renderer and the HUD need from a live run or a replay. */
+export interface FlightView {
+  readonly config: Config;
+  readonly seed: bigint;
+  readonly info: VehicleInfo;
+  readonly state: Telemetry;
+  readonly previousState: Telemetry;
+  readonly outcome: number;
+  readonly outcomeName: string;
+  readonly score: number;
+}
+
+function requireIndices(): [Record<TelemetryKey, number>, Record<InfoKey, number>] {
+  if (telemetryIndex === null || infoIndex === null) {
+    throw new Error("loadWasm() must complete before creating a simulation");
+  }
+  return [telemetryIndex, infoIndex];
+}
+
 /** One recorded run. Call `dispose()` when done to free WASM memory. */
-export class Simulation {
+export class Simulation implements FlightView {
   readonly config: Config;
   readonly seed: bigint;
   readonly info: VehicleInfo;
@@ -195,5 +218,89 @@ export class Simulation {
 
   dispose(): void {
     this.sim.free();
+  }
+}
+
+/** Plays a replay string back tick by tick. Call `dispose()` when done. */
+export class ReplayPlayer implements FlightView {
+  readonly config: Config;
+  readonly seed: bigint;
+  readonly info: VehicleInfo;
+  readonly totalTicks: number;
+  private readonly player: WasmReplay;
+  private readonly telemetryIdx: Record<TelemetryKey, number>;
+  private current: Telemetry;
+  private previous: Telemetry;
+
+  /** Throws if the string is not a valid replay for this build. */
+  constructor(encoded: string) {
+    const [tIdx, iIdx] = requireIndices();
+    this.telemetryIdx = tIdx;
+    const player = new WasmReplay(encoded);
+    try {
+      const config = player.config();
+      if (!isConfig(config)) throw new Error(`replay uses an unknown configuration ${config}`);
+      this.config = config;
+      this.seed = player.seed();
+      this.totalTicks = player.totalTicks();
+      this.info = toRecord(player.vehicleInfo(), iIdx);
+      this.current = toRecord(player.telemetry(), tIdx);
+    } catch (error) {
+      player.free();
+      throw error;
+    }
+    this.player = player;
+    this.previous = this.current;
+  }
+
+  /** Plays one recorded tick. Returns true once the playback is over. */
+  step(): boolean {
+    if (this.player.isDone()) {
+      this.previous = this.current;
+      return true;
+    }
+    this.previous = this.current;
+    const done = this.player.step();
+    this.current = toRecord(this.player.telemetry(), this.telemetryIdx);
+    return done;
+  }
+
+  get done(): boolean {
+    return this.player.isDone();
+  }
+
+  get tick(): number {
+    return this.player.tick();
+  }
+
+  /** Quantized pilot inputs of the last played tick. */
+  get lastInput(): readonly [number, number, number] {
+    if (this.player.tick() === 0) return [this.info.initial_throttle_level, 127, 127];
+    const q = this.player.lastInput();
+    return [q[0] ?? 127, q[1] ?? 127, q[2] ?? 127];
+  }
+
+  get state(): Telemetry {
+    return this.current;
+  }
+
+  get previousState(): Telemetry {
+    return this.previous;
+  }
+
+  get outcome(): number {
+    return this.player.outcome();
+  }
+
+  get outcomeName(): string {
+    return wasmOutcomeName(this.player.outcome());
+  }
+
+  get score(): number {
+    return this.player.score();
+  }
+
+  dispose(): void {
+    this.player.free();
   }
 }
