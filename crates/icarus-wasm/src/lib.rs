@@ -247,6 +247,21 @@ impl WasmReplay {
     pub fn score(&self) -> u32 {
         self.sim.score()
     }
+
+    /// Quantized inputs `[throttle, gimbal, rcs]` of the last played tick
+    /// (neutral before the first one), for displaying the pilot's commands.
+    #[wasm_bindgen(js_name = lastInput)]
+    pub fn last_input(&self) -> Vec<u8> {
+        self.cursor
+            .checked_sub(1)
+            .and_then(|i| self.replay.inputs.get(i))
+            .map_or_else(|| vec![127, 127, 127], |q| q.to_vec())
+    }
+
+    /// Ticks played so far.
+    pub fn tick(&self) -> u32 {
+        u32::try_from(self.cursor).unwrap_or(u32::MAX)
+    }
 }
 
 /// Names of the telemetry values, in array order.
