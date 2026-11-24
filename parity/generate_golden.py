@@ -9,6 +9,11 @@ over the telemetry after every tick. The same files are then checked against:
 - the WebAssembly build under Node (parity/verify_wasm.mjs),
 - the native Rust core (crates/icarus-core/tests/golden.rs).
 
+Cases flown by a built-in controller (`"controller": "pid"`) also prove that
+the controller itself is bit-identical: every checker re-runs it and requires
+the recorded decision at every tick. Those goldens must be regenerated
+(`--force`) whenever the controller's gains change, even if the physics did not.
+
 The input sequences are stored in the goldens, so the checkers replay them
 and never re-run these policies. `--check` does re-run them: the controller
 case uses Python's `math` (the platform's libm), so on another OS `--check` can
@@ -93,6 +98,8 @@ class Case:
     policy: Policy
     events: list[Event] = field(default_factory=list)
     max_ticks: int = 7_200
+    # Name of the built-in controller that produces the inputs, if any.
+    controller: str | None = None
 
 
 # --- Input policies ---------------------------------------------------------
@@ -171,6 +178,26 @@ def hard_landing(tick: int, sim: icarus.Sim) -> Quantized:
     return q
 
 
+def controller_policy(name: str, config: str) -> Policy:
+    ctrl = icarus.Controller(name, config)
+
+    def policy(_tick: int, sim: icarus.Sim) -> Quantized:
+        return ctrl.act(sim)
+
+    return policy
+
+
+def pid_case(name: str, config: str, seed: int, events: list[Event] | None = None) -> Case:
+    return Case(
+        name,
+        config,
+        seed,
+        controller_policy("pid", config),
+        events=events or [],
+        controller="pid",
+    )
+
+
 CASES = [
     Case("easy_scripted", "easy", 1, scripted_easy, max_ticks=1_500),
     Case("realistic_scripted", "realistic", 2, scripted_realistic),
@@ -197,6 +224,11 @@ CASES = [
     Case("crosswind_controller", "crosswind", 7, descent_controller),
     Case("storm_fuzz", "storm", 8, make_fuzz(99), max_ticks=3_000),
     Case("engine_out_scripted", "engine_out", 9, scripted_realistic),
+    # The classical autopilot: its decisions must match everywhere too.
+    pid_case("easy_pid", "easy", 10),
+    pid_case("realistic_pid", "realistic", 11),
+    pid_case("storm_pid", "storm", 12),
+    pid_case("engine_out_pid", "engine_out", 13, events=[Event(600, "gust", -9.0, 3.0)]),
 ]
 
 MANIFEST = GOLDEN_DIR / "manifest.json"
@@ -241,7 +273,7 @@ def run(case: Case) -> dict[str, object]:
         else:
             runs.append([1, *q])
 
-    return {
+    result: dict[str, object] = {
         "format": GOLDEN_FORMAT,
         "physics_version": icarus.PHYSICS_VERSION,
         "name": case.name,
@@ -260,6 +292,9 @@ def run(case: Case) -> dict[str, object]:
         # same ticks.
         "replay": recorder.replay(),
     }
+    if case.controller is not None:
+        result["controller"] = case.controller
+    return result
 
 
 def main() -> int:

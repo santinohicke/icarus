@@ -9,8 +9,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use icarus_core::{
-    Controls, Injection, PHYSICS_VERSION, RecordingSim, Replay, Sim, TELEMETRY_FIELDS,
-    VehicleConfig,
+    ControllerKind, Controls, Injection, Observation, PHYSICS_VERSION, RecordingSim, Replay, Sim,
+    TELEMETRY_FIELDS, VehicleConfig,
 };
 use serde_json::Value;
 
@@ -104,6 +104,12 @@ fn native_core_matches_goldens() {
         let config = VehicleConfig::from_name(golden["config"].as_str().unwrap()).unwrap();
         let seed: u64 = golden["seed"].as_str().unwrap().parse().unwrap();
         let mut sim = Sim::from_config(config, seed);
+        // Goldens flown by a controller: it must make the recorded decision.
+        let mut controller = golden["controller"].as_str().map(|name| {
+            ControllerKind::from_name(name)
+                .unwrap_or_else(|| panic!("{name}: unknown controller"))
+                .build(sim.params())
+        });
         let events = golden["events"].as_array().unwrap();
         let samples = golden["samples"].as_array().unwrap();
         let check = |tick: u64, telemetry: &[f64]| {
@@ -136,6 +142,10 @@ fn native_core_matches_goldens() {
             for _ in 0..count {
                 for e in events.iter().filter(|e| e["tick"].as_u64() == Some(tick)) {
                     sim.inject(injection(e));
+                }
+                if let Some(c) = controller.as_mut() {
+                    let decided = c.act_quantized(&Observation::from_sim(&sim));
+                    assert_eq!(decided, q, "{name}: controller differs at tick {tick}");
                 }
                 sim.step(Controls::from_quantized(q));
                 tick += 1;

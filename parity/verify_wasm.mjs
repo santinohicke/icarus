@@ -7,7 +7,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { WasmReplay, WasmSim, initSync, physicsVersion, telemetryFields } from "../web/src/wasm/icarus_wasm.js";
+import { WasmController, WasmReplay, WasmSim, initSync, physicsVersion, telemetryFields } from "../web/src/wasm/icarus_wasm.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const goldenDir = join(here, "golden");
@@ -72,6 +72,8 @@ function check(golden) {
   if (lastSample.tick !== golden.ticks) return ["last sample is not at the final tick"];
 
   const sim = new WasmSim(golden.config, BigInt(golden.seed));
+  // Goldens flown by a controller: it must make the recorded decision every tick.
+  const controller = golden.controller ? new WasmController(golden.controller, golden.config) : null;
   const samples = new Map(golden.samples.map((s) => [s.tick, s.telemetry]));
   let bits = bitsOf(sim.telemetry());
   let h = fnv1a(FNV_OFFSET, bits);
@@ -90,6 +92,13 @@ function check(golden) {
   for (const [count, q0, q1, q2] of golden.inputs) {
     for (let n = 0; n < count; n += 1) {
       for (const e of golden.events) if (e.tick === tick) applyEvent(sim, e);
+      if (controller !== null) {
+        const d = controller.act(sim);
+        if (d[0] !== q0 || d[1] !== q1 || d[2] !== q2) {
+          errors.push(`tick ${tick}: controller decided [${Array.from(d)}], recorded [${q0},${q1},${q2}]`);
+          break;
+        }
+      }
       sim.step(q0, q1, q2);
       tick += 1;
       const telemetry = sim.telemetry();
@@ -120,6 +129,7 @@ function check(golden) {
     errors.push("replay string does not reproduce the final state");
   }
   player.free();
+  controller?.free();
   sim.free();
   return errors;
 }

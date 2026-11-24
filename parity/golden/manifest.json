@@ -11,6 +11,10 @@
   "training_controller",
   "crosswind_controller",
   "storm_fuzz",
-  "engine_out_scripted"
+  "engine_out_scripted",
+  "easy_pid",
+  "realistic_pid",
+  "storm_pid",
+  "engine_out_pid"
  ]
 }
