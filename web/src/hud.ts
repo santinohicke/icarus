@@ -41,7 +41,6 @@ export function commandedFraction(level: number, info: VehicleInfo): number | nu
 export class Hud {
   private readonly rows = new Map<string, Row>();
   private readonly fuelBar: HTMLDivElement;
-  private readonly gates = new Map<string, HTMLSpanElement>();
   private readonly faults: HTMLDivElement;
 
   constructor(root: HTMLElement) {
@@ -61,17 +60,12 @@ export class Hud {
     };
 
     const nav = section("NAVIGATION");
-    add(nav, "met", "MET");
     add(nav, "alt", "ALT");
     add(nav, "vs", "V/S");
-    add(nav, "hs", "H/S");
-    add(nav, "dx", "PAD Δx");
     add(nav, "tilt", "TILT");
-    add(nav, "rate", "RATE");
 
     const prop = section("PROPULSION");
     add(prop, "engine", "ENGINE");
-    add(prop, "cmd", "THR CMD");
     add(prop, "thrust", "THRUST");
     add(prop, "gimbal", "GIMBAL");
     add(prop, "rcs", "RCS");
@@ -86,21 +80,6 @@ export class Hud {
     add(env, "wind", "WIND");
     this.faults = el("div", "hud-faults");
     env.append(this.faults);
-
-    const gates = section("TOUCHDOWN GATES");
-    const chips = el("div", "hud-gates");
-    for (const [key, label] of [
-      ["vs", "V/S"],
-      ["hs", "H/S"],
-      ["tilt", "TILT"],
-      ["rate", "RATE"],
-      ["pad", "PAD"],
-    ] as const) {
-      const chip = el("span", "gate", label);
-      chips.append(chip);
-      this.gates.set(key, chip);
-    }
-    gates.append(chips);
   }
 
   private set(key: string, text: string, level: Level = "idle"): void {
@@ -110,52 +89,30 @@ export class Hud {
     r.row.dataset["level"] = level;
   }
 
-  private gate(key: string, label: string, ok: boolean): void {
-    const chip = this.gates.get(key);
-    if (!chip) return;
-    const text = `${label} ${ok ? "✓" : "✗"}`;
-    if (chip.textContent !== text) chip.textContent = text;
-    chip.dataset["ok"] = ok ? "1" : "0";
-    chip.setAttribute("aria-label", `${label} ${ok ? "within" : "outside"} the landing limit`);
-  }
-
   update(t: Telemetry, info: VehicleInfo, throttleLevel: number, rcsLevel: number): void {
     const near = t.clearance < 150;
     const tilt = wrap(t.theta);
     // Speeds are those of the lowest leg tip, exactly what the core judges at
-    // touchdown (centre-of-mass speed plus rotation), with the same strict limits.
+    // touchdown (centre-of-mass speed plus rotation), with the same limits.
     const vsOk = Math.abs(t.contact_vy) < info.max_vertical_speed;
-    const hsOk = Math.abs(t.contact_vx) < info.max_horizontal_speed;
     const tiltOk = Math.abs(tilt) < info.max_tilt;
-    const rateOk = Math.abs(t.omega) < info.max_angular_rate;
-    const padOk = t.pad_margin >= 0;
     const judge = (ok: boolean, marginal: boolean): Level => (!near ? "idle" : ok ? "ok" : marginal ? "warn" : "bad");
 
-    this.set("met", `T+${t.time.toFixed(1)} s`);
     this.set("alt", `${Math.max(0, t.clearance).toFixed(1)} m`);
     this.set(
       "vs",
       `${signed(t.contact_vy, 1)} m/s`,
       judge(vsOk, Math.abs(t.contact_vy) < 3 * info.max_vertical_speed),
     );
-    this.set(
-      "hs",
-      `${signed(t.contact_vx, 1)} m/s`,
-      judge(hsOk, Math.abs(t.contact_vx) < 3 * info.max_horizontal_speed),
-    );
-    this.set("dx", `${signed(t.tail_x, 1)} m`, judge(padOk, t.pad_margin > -info.pad_half_width));
     this.set("tilt", `${signed(tilt * RAD_TO_DEG, 1)}°`, judge(tiltOk, Math.abs(tilt) < 2 * info.max_tilt));
-    this.set("rate", `${signed(t.omega * RAD_TO_DEG, 1)}°/s`, judge(rateOk, Math.abs(t.omega) < 2 * info.max_angular_rate));
 
     const on = t.engine_on > 0.5;
-    this.set("engine", on ? "RUNNING" : "OFF", on ? "ok" : "idle");
-    const frac = commandedFraction(throttleLevel, info);
+    // Asking for thrust with no ignitions (or propellant) left is the one
+    // command problem worth flagging; it shows on the engine row.
+    const wantsThrust = commandedFraction(throttleLevel, info) !== null;
     const canIgnite = t.ignitions_left > 0 && t.propellant > 0;
-    this.set(
-      "cmd",
-      frac === null ? "CUT-OFF" : !on && !canIgnite ? "NO IGNITION" : `${(frac * 100).toFixed(0)} %`,
-      frac !== null && !on && !canIgnite ? "bad" : "idle",
-    );
+    const stuckOff = !on && wantsThrust && !canIgnite;
+    this.set("engine", on ? "RUNNING" : stuckOff ? "NO IGNITION" : "OFF", on ? "ok" : stuckOff ? "bad" : "idle");
     this.set("thrust", `${(t.thrust_fraction * 100).toFixed(0)} %`);
     this.set("gimbal", `${signed(t.gimbal * RAD_TO_DEG, 1)}°`, t.gimbal_stuck > 0.5 ? "bad" : "idle");
     this.set("rcs", rcsLevel > Q_CENTER ? "◀ CCW" : rcsLevel < Q_CENTER ? "CW ▶" : "—");
@@ -173,11 +130,5 @@ export class Hud {
     if (t.thrust_factor < 1) faults.push(`THRUST LIMITED ${(t.thrust_factor * 100).toFixed(0)} %`);
     const text = faults.join(" · ");
     if (this.faults.textContent !== text) this.faults.textContent = text;
-
-    this.gate("vs", "V/S", vsOk);
-    this.gate("hs", "H/S", hsOk);
-    this.gate("tilt", "TILT", tiltOk);
-    this.gate("rate", "RATE", rateOk);
-    this.gate("pad", "PAD", padOk);
   }
 }
