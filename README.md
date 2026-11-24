@@ -6,7 +6,18 @@ A 2D landing simulator for a reusable rocket first stage. The physics is written
 
 The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 
-**Status: Stage 1 complete** (core + first playable). The reinforcement-learning agent, the classical baselines and the polished web app are the next stages.
+**Play it: <https://santinohicke.github.io/icarus/>**
+
+**Status: Stages 1 and 2 complete** (core, first playable, playable web app). The classical baselines and the reinforcement-learning agent are the next stages.
+
+## What is in Stage 2 (the web app)
+
+- Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt (<kbd>T</kbd>).
+- Touch controls: a throttle bar, gimbal and RCS buttons and an engine cut-off, switched on by the first touch.
+- Failure injection mid-flight: stuck gimbal, thrust loss and gusts (buttons or keys <kbd>7</kbd>–<kbd>0</kbd>). They are recorded in the replay.
+- Local high scores per difficulty (localStorage, validated on load), each with a "Watch" button.
+- Shareable links: a replay travels in the URL hash (`#replay=...`, never sent to a server) and plays back at 1×/2×/4×; a challenge link (`?config=...&seed=...`) opens the same scenario.
+- Deployed to GitHub Pages by CI, only after the WebAssembly build matches the golden trajectories bit for bit.
 
 ## What is in Stage 1
 
@@ -61,6 +72,8 @@ Controls:
 | R | Retry |
 | N | New scenario |
 | 1 / 2 | Easy / realistic |
+| T | Telemetry charts |
+| 7 / 8 / 9 / 0 | Inject: stuck gimbal / thrust loss / gust left / gust right |
 
 ### Use it from Python
 
@@ -86,7 +99,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace                       # physics, convergence, analytic, determinism, replays, goldens
 cd training && python -m pytest              # Python API + golden parity
 node parity/verify_wasm.mjs                  # WebAssembly matches the goldens bit for bit
-cd web && npm test                           # loop, controls, frame-rate independence, playability
+cd web && npm test                           # loop, controls, frame-rate independence, playability, scores, links, replays
 ```
 
 Some highlights:

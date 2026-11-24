@@ -363,7 +363,7 @@ icarus/
 │       ├── controls.ts           # keyboard, mouse and touch
 │       ├── policies.ts           # human (keyboard/touch), AI and PID (via .wasm)
 │       ├── render.ts             # rocket, pad, flame, wind
-│       ├── hud.ts                # text HUD (stage 1); telemetry.ts with uPlot in stage 2
+│       ├── hud.ts                # text HUD; telemetry.ts (uPlot charts), touch.ts, scores.ts, share.ts
 │       ├── replay.ts             # export/import, URL-hash links
 │       └── scores.ts             # localStorage high scores
 ├── parity/
@@ -398,7 +398,7 @@ icarus/
 | Stage | Content | Estimated time |
 | --- | --- | --- |
 | 1. Core + first playable | **Week 1, vertical slice:** core dynamics (RK4, gravity, gimballed thrust, mass flow) → WASM binding → Canvas page you can land with the keyboard at 60 Hz. If landing by hand isn't fun or the physics feels artificial, fix it now: tuning the RL reward on top of bad physics is a nightmare. **Then:** the complete physics model (aerodynamics, RCS, wind, faults, sensors, RNG streams, touchdown detection, outcomes and score, both vehicle configs), replay format, Python binding, bit-exact parity test (native, Python, WASM), CI | ✅ Done |
-| 2. Playable web | Telemetry (uPlot), touch controls, difficulty selector, failure buttons, local high scores, replay links in the URL hash, analytics, GitHub Pages deploy | 1 week |
+| 2. Playable web | Telemetry (uPlot), touch controls, difficulty selector, failure buttons, local high scores, replay links in the URL hash, GitHub Pages deploy. Analytics pending (needs a GoatCounter/Plausible account) | ✅ Done (except analytics) |
 | 3. PID baseline | Cascaded PID in Rust (with the ignition trigger for `realistic`), evaluation battery; validates the environment on `easy` first | 1 week |
 | 4. Agent | `env` module in the core, Rust vectorized env, PPO, curriculum, domain randomization, failures, normalization export | 2–3 weeks |
 | 5. AI on the web | Hand-written MLP inference in Rust/WASM, AI mode and duel mode | 1 week |
