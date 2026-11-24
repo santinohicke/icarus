@@ -7,6 +7,10 @@
   "easy_controller",
   "realistic_fuzz",
   "easy_relight",
-  "easy_hard_landing"
+  "easy_hard_landing",
+  "training_controller",
+  "crosswind_controller",
+  "storm_fuzz",
+  "engine_out_scripted"
  ]
 }

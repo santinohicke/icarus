@@ -192,6 +192,11 @@ CASES = [
     # bits of the seeding.
     Case("easy_relight", "easy", 2**64 - 1, scripted_relight, max_ticks=1_200),
     Case("easy_hard_landing", "easy", 2**53 + 1, hard_landing),
+    # Campaign levels: calm air, gusty wind, a storm, and a scheduled fault.
+    Case("training_controller", "training", 6, descent_controller),
+    Case("crosswind_controller", "crosswind", 7, descent_controller),
+    Case("storm_fuzz", "storm", 8, make_fuzz(99), max_ticks=3_000),
+    Case("engine_out_scripted", "engine_out", 9, scripted_realistic),
 ]
 
 MANIFEST = GOLDEN_DIR / "manifest.json"
