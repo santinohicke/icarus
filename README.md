@@ -12,12 +12,14 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 
 ## What is in Stage 2 (the web app)
 
-- Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt. Hidden by default; <kbd>T</kbd> opens them.
-- Touch controls: a throttle bar, gimbal and RCS buttons and an engine cut-off, switched on by the first touch.
-- Failure injection mid-flight: stuck gimbal, thrust loss and gusts (buttons or keys <kbd>7</kbd>–<kbd>0</kbd>). They are recorded in the replay.
-- Local high scores per difficulty (localStorage, validated on load), each with a "Watch" button.
-- Shareable links: a replay travels in the URL hash (`#replay=...`, never sent to a server) and plays back at 1×/2×/4×; a challenge link (`?config=...&seed=...`) opens the same scenario.
-- Deployed to Cloudflare Pages (with Cloudflare Web Analytics) by CI, only after the WebAssembly build matches the golden trajectories bit for bit.
+- Main menu: the Earth from orbit with the stage circling it, and the two missions as big menu items.
+- Quiet synthesized sound effects (engine, RCS, touchdown, explosion), with a mute toggle.
+- White RCS cold-gas jets at the nose, on the side opposite to the push.
+- Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt. Hidden by default.
+- Touch controls: a throttle bar, steering and RCS buttons and an engine cut-off, switched on by the first touch.
+- Local high scores per mission (localStorage, validated on load), each with a "Watch" button.
+- Shareable replay links: the run travels in the URL hash (`#replay=...`, never sent to a server) and plays back at 1×/2×/4×.
+- Deployed to Cloudflare Pages (with Cloudflare Web Analytics), only after the WebAssembly build matches the golden trajectories bit for bit.
 
 ## What is in Stage 1
 
@@ -63,17 +65,11 @@ Controls:
 | Key | Action |
 | --- | --- |
 | ↑ / ↓ | Throttle |
-| ← / → | Gimbal |
+| ← / → | Steer (gimbal) |
 | Q / E | RCS |
 | X | Cut the engine |
-| Z | Full throttle |
-| Space | Launch / resume |
-| P | Pause |
-| R | Retry |
-| N | New scenario |
-| 1 / 2 | Easy / realistic |
-| T | Telemetry charts |
-| 7 / 8 / 9 / 0 | Inject: stuck gimbal / thrust loss / gust left / gust right |
+| Space | Launch |
+| Esc | Pause (resume, retry, new scenario, main menu) |
 
 ### Use it from Python
 
