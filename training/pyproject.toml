@@ -1,0 +1,15 @@
+[project]
+name = "icarus-training"
+version = "0.1.0"
+description = "Training, evaluation and parity tooling for the Icarus simulator."
+requires-python = ">=3.11"
+# The `icarus` module is built from crates/icarus-py with maturin:
+#   maturin develop --release -m crates/icarus-py/Cargo.toml
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "maturin>=1.9.4,<2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
