@@ -11,6 +11,10 @@
 use icarus_core::physics::scenario::Outcome;
 use icarus_core::physics::state::QUANT_MAX;
 use icarus_core::replay::REPLAY_FORMAT_VERSION;
+use std::time::Instant;
+
+use icarus_core::control::{Controller, ControllerKind, Observation};
+use icarus_core::eval::{Scenario, summarize};
 use icarus_core::{
     Controls, Injection, PHYSICS_VERSION, RecordingSim, Replay, Sim, TELEMETRY_FIELDS,
     VehicleConfig,
@@ -24,6 +28,24 @@ fn parse_config(name: &str) -> PyResult<VehicleConfig> {
         let valid: Vec<&str> = VehicleConfig::ALL.iter().map(|c| c.name()).collect();
         PyValueError::new_err(format!(
             "unknown vehicle configuration {name:?}; expected one of {valid:?}"
+        ))
+    })
+}
+
+fn parse_scenario(name: &str) -> PyResult<Scenario> {
+    Scenario::from_name(name).ok_or_else(|| {
+        let valid: Vec<&str> = Scenario::ALL.iter().map(|s| s.name()).collect();
+        PyValueError::new_err(format!(
+            "unknown scenario {name:?}; expected one of {valid:?}"
+        ))
+    })
+}
+
+fn parse_controller(name: &str) -> PyResult<ControllerKind> {
+    ControllerKind::from_name(name).ok_or_else(|| {
+        let valid: Vec<&str> = ControllerKind::ALL.iter().map(|c| c.name()).collect();
+        PyValueError::new_err(format!(
+            "unknown controller {name:?}; expected one of {valid:?}"
         ))
     })
 }
@@ -58,21 +80,28 @@ fn telemetry_dict<'py>(py: Python<'py>, sim: &Sim) -> PyResult<Bound<'py, PyDict
 /// Args:
 ///     config: a configuration name, see ``configs()``.
 ///     seed: episode seed (initial conditions, wind, sensor noise, faults).
+///     scenario: an evaluation scenario applied on top of the configuration,
+///         see ``scenarios()`` (``"nominal"`` keeps it as is).
 #[pyclass(module = "icarus", name = "Sim")]
 pub struct PySim {
     inner: Sim,
     config: VehicleConfig,
+    scenario: Scenario,
 }
 
 #[pymethods]
 impl PySim {
     #[new]
-    #[pyo3(signature = (config = "easy", seed = 0))]
-    fn new(config: &str, seed: u64) -> PyResult<Self> {
+    #[pyo3(signature = (config = "easy", seed = 0, scenario = "nominal"))]
+    fn new(config: &str, seed: u64, scenario: &str) -> PyResult<Self> {
         let config = parse_config(config)?;
+        let scenario = parse_scenario(scenario)?;
+        let inner = Sim::new(scenario.params(config), seed)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self {
-            inner: Sim::from_config(config, seed),
+            inner,
             config,
+            scenario,
         })
     }
 
@@ -144,6 +173,7 @@ impl PySim {
     fn copy_episode(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+            scenario: self.scenario,
             config: self.config,
         }
     }
@@ -160,6 +190,12 @@ impl PySim {
     #[getter]
     fn config(&self) -> &'static str {
         self.config.name()
+    }
+
+    /// Evaluation scenario name (``"nominal"`` unless given).
+    #[getter]
+    fn scenario(&self) -> &'static str {
+        self.scenario.name()
     }
 
     /// Episode seed.
@@ -386,7 +422,175 @@ fn run_replay(encoded: &str) -> PyResult<PySim> {
     Ok(PySim {
         inner: replay.run(),
         config: replay.config,
+        scenario: Scenario::Nominal,
     })
+}
+
+/// A classical controller that flies a ``Sim`` through the same quantized
+/// interface as a player: ``sim.step_quantized(*ctrl.act(sim))``.
+///
+/// It only reads what a flight computer would know (delayed, noisy sensors,
+/// its engine state and propellant gauge), never the true state or faults.
+///
+/// Args:
+///     controller: a controller name, see ``controllers()``.
+///     config: the configuration it will fly (its vehicle parameters).
+///     scenario: the scenario it will fly (e.g. the sensor delay it compensates).
+#[pyclass(module = "icarus", name = "Controller")]
+pub struct PyController {
+    inner: Box<dyn Controller + Send + Sync>,
+    kind: ControllerKind,
+    config: VehicleConfig,
+    scenario: Scenario,
+    /// Tick of the last decision, to refuse a second decision in one tick
+    /// (it would advance the controller's internal state twice).
+    last_tick: Option<u64>,
+}
+
+impl PyController {
+    fn decide(
+        &mut self,
+        sim: &Sim,
+        config: VehicleConfig,
+        scenario: Scenario,
+    ) -> PyResult<[u8; 3]> {
+        if config != self.config || scenario != self.scenario {
+            return Err(PyValueError::new_err(format!(
+                "controller built for {:?}/{:?} cannot fly a {:?}/{:?} sim",
+                self.config.name(),
+                self.scenario.name(),
+                config.name(),
+                scenario.name()
+            )));
+        }
+        let tick = sim.tick();
+        if self.last_tick == Some(tick) {
+            return Err(PyValueError::new_err(
+                "act() was already called for this tick; step the sim first (or reset())",
+            ));
+        }
+        self.last_tick = Some(tick);
+        Ok(self.inner.act_quantized(&Observation::from_sim(sim)))
+    }
+}
+
+#[pymethods]
+impl PyController {
+    #[new]
+    #[pyo3(signature = (controller = "pid", config = "easy", scenario = "nominal"))]
+    fn new(controller: &str, config: &str, scenario: &str) -> PyResult<Self> {
+        let kind = parse_controller(controller)?;
+        let config = parse_config(config)?;
+        let scenario = parse_scenario(scenario)?;
+        Ok(Self {
+            inner: kind.build(&scenario.params(config)),
+            kind,
+            config,
+            scenario,
+            last_tick: None,
+        })
+    }
+
+    /// Quantized commands ``(throttle, gimbal, rcs)`` for the sim's current
+    /// tick. Call once per tick, before stepping. Raises ``ValueError`` if
+    /// the sim's configuration or scenario differs from the controller's, or
+    /// if this tick was already decided.
+    fn act(&mut self, sim: PyRef<'_, PySim>) -> PyResult<(u8, u8, u8)> {
+        let [a, b, c] = self.decide(&sim.inner, sim.config, sim.scenario)?;
+        Ok((a, b, c))
+    }
+
+    /// The same for a ``Recorder`` (nominal scenario only), so a controller's
+    /// flight can be replayed.
+    fn act_recorder(&mut self, recorder: PyRef<'_, PyRecorder>) -> PyResult<(u8, u8, u8)> {
+        let [a, b, c] = self.decide(recorder.inner.sim(), recorder.config, Scenario::Nominal)?;
+        Ok((a, b, c))
+    }
+
+    /// Forgets the internal state, for a new episode.
+    fn reset(&mut self) {
+        self.inner.reset();
+        self.last_tick = None;
+    }
+
+    /// Controller name.
+    #[getter]
+    fn name(&self) -> &'static str {
+        self.kind.name()
+    }
+}
+
+/// Runs one controller on one configuration and scenario over the given
+/// seeds, in Rust (the GIL is released while it runs).
+///
+/// Returns one dict per seed with: ``seed``, ``outcome``, ``landed``,
+/// ``score``, ``ticks``, ``contact_vx``, ``contact_vy``, ``position_error``,
+/// ``propellant_used``, ``tilt`` and ``act_ns`` (mean wall-clock time of one
+/// controller decision in nanoseconds: the only non-deterministic field).
+#[pyfunction]
+#[pyo3(signature = (controller, config, scenario, seeds))]
+fn evaluate<'py>(
+    py: Python<'py>,
+    controller: &str,
+    config: &str,
+    scenario: &str,
+    seeds: Vec<u64>,
+) -> PyResult<Vec<Bound<'py, PyDict>>> {
+    let kind = parse_controller(controller)?;
+    let params = parse_scenario(scenario)?.params(parse_config(config)?);
+    params
+        .validate()
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let results = py.detach(|| {
+        let mut ctrl = kind.build(&params);
+        seeds
+            .iter()
+            .map(|&seed| {
+                let mut sim = Sim::new(params.clone(), seed).expect("parameters validated above");
+                ctrl.reset();
+                let mut act_time: u128 = 0;
+                while sim.outcome().is_none() {
+                    let obs = Observation::from_sim(&sim);
+                    let start = Instant::now();
+                    let q = ctrl.act_quantized(&obs);
+                    act_time += start.elapsed().as_nanos();
+                    sim.step(Controls::from_quantized(q));
+                }
+                let ticks = sim.tick().max(1);
+                (seed, summarize(&sim), act_time as f64 / ticks as f64)
+            })
+            .collect::<Vec<_>>()
+    });
+    results
+        .into_iter()
+        .map(|(seed, r, act_ns)| {
+            let d = PyDict::new(py);
+            d.set_item("seed", seed)?;
+            d.set_item("outcome", r.outcome.name())?;
+            d.set_item("landed", r.landed())?;
+            d.set_item("score", r.score)?;
+            d.set_item("ticks", r.ticks)?;
+            d.set_item("contact_vx", r.contact_vx)?;
+            d.set_item("contact_vy", r.contact_vy)?;
+            d.set_item("position_error", r.position_error)?;
+            d.set_item("propellant_used", r.propellant_used)?;
+            d.set_item("tilt", r.tilt)?;
+            d.set_item("act_ns", act_ns)?;
+            Ok(d)
+        })
+        .collect()
+}
+
+/// Names of the evaluation scenarios.
+#[pyfunction]
+fn scenarios() -> Vec<&'static str> {
+    Scenario::ALL.iter().map(|s| s.name()).collect()
+}
+
+/// Names of the built-in controllers.
+#[pyfunction]
+fn controllers() -> Vec<&'static str> {
+    ControllerKind::ALL.iter().map(|c| c.name()).collect()
 }
 
 /// Names of the built-in vehicle configurations.
@@ -408,6 +612,10 @@ fn outcome_from_code(code: i64) -> Option<&'static str> {
 fn icarus(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySim>()?;
     m.add_class::<PyRecorder>()?;
+    m.add_class::<PyController>()?;
+    m.add_function(wrap_pyfunction!(evaluate, m)?)?;
+    m.add_function(wrap_pyfunction!(scenarios, m)?)?;
+    m.add_function(wrap_pyfunction!(controllers, m)?)?;
     m.add_function(wrap_pyfunction!(run_replay, m)?)?;
     m.add_function(wrap_pyfunction!(configs, m)?)?;
     m.add_function(wrap_pyfunction!(outcome_from_code, m)?)?;

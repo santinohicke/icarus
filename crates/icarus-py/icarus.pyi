@@ -17,11 +17,43 @@ def outcome_from_code(code: int) -> str | None:
 def run_replay(encoded: str) -> Sim:
     """Re-simulates a replay string. Raises ``ValueError`` if it is invalid."""
 
+def scenarios() -> list[str]:
+    """Names of the evaluation scenarios (``"nominal"`` first)."""
+
+def controllers() -> list[str]:
+    """Names of the built-in classical controllers."""
+
+def evaluate(controller: str, config: str, scenario: str, seeds: list[int]) -> list[dict[str, Any]]:
+    """Runs a controller over seeds in Rust; one result dict per seed.
+
+    Keys: seed, outcome, landed, score, ticks, contact_vx, contact_vy,
+    position_error, propellant_used, tilt, act_ns (wall-clock, the only
+    non-deterministic field).
+    """
+
+@final
+class Controller:
+    """A classical controller: ``sim.step_quantized(*ctrl.act(sim))``."""
+
+    def __new__(cls, controller: str = "pid", config: str = "easy", scenario: str = "nominal") -> Controller: ...
+    def act(self, sim: Sim) -> tuple[int, int, int]:
+        """Quantized commands for the sim's current tick (once per tick).
+
+        Raises ``ValueError`` if the sim's config/scenario differs from the
+        controller's, or if this tick was already decided.
+        """
+    def act_recorder(self, recorder: Recorder) -> tuple[int, int, int]:
+        """Quantized commands for a recorder's current tick."""
+    def reset(self) -> None:
+        """Forgets the internal state, for a new episode."""
+    @property
+    def name(self) -> str: ...
+
 @final
 class Sim:
     """One landing episode. Use one object per thread."""
 
-    def __new__(cls, config: str = "easy", seed: int = 0) -> Sim: ...
+    def __new__(cls, config: str = "easy", seed: int = 0, scenario: str = "nominal") -> Sim: ...
     def step(self, throttle: float, gimbal: float = 0.0, rcs: float = 0.0) -> str | None:
         """Advances one tick with normalized controls in [-1, 1]."""
     def step_quantized(self, throttle: int, gimbal: int, rcs: int) -> str | None:
