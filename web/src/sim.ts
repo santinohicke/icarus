@@ -1,6 +1,7 @@
 // Typed wrapper around the WebAssembly simulation.
 
 import init, {
+  WasmController,
   WasmReplay,
   WasmSim,
   outcomeName as wasmOutcomeName,
@@ -217,6 +218,13 @@ export class Simulation implements FlightView {
     return this.sim.replay();
   }
 
+  /** Quantized commands a controller chooses for this tick (see `Autopilot`). */
+  decide(controller: WasmController): [number, number, number] {
+    const q = controller.act(this.sim);
+    // A missing value never happens; if it did, engine off is the safe default.
+    return [q[0] ?? 0, q[1] ?? 127, q[2] ?? 127];
+  }
+
   dispose(): void {
     this.sim.free();
   }
@@ -303,5 +311,28 @@ export class ReplayPlayer implements FlightView {
 
   dispose(): void {
     this.player.free();
+  }
+}
+
+/**
+ * The classical autopilot (the PID of `icarus-core`, compiled to WASM). It
+ * only reads what a flight computer would: delayed noisy sensors, its engine
+ * state and its propellant gauge. Its decisions are bit-identical to the
+ * native and Python builds. Call `dispose()` when done.
+ */
+export class Autopilot {
+  private readonly controller: WasmController;
+
+  constructor(config: Config) {
+    this.controller = new WasmController("pid", config);
+  }
+
+  /** Commands for this tick. Call exactly once per tick, before `sim.step`. */
+  act(sim: Simulation): [number, number, number] {
+    return sim.decide(this.controller);
+  }
+
+  dispose(): void {
+    this.controller.free();
   }
 }

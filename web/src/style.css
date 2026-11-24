@@ -373,7 +373,8 @@ kbd {
   display: none;
 }
 
-body[data-mode="replay"] .help {
+body[data-mode="replay"] .help,
+body[data-mode="auto"] .help {
   display: none;
 }
 
@@ -432,7 +433,8 @@ body.touch-mode .touch-controls {
   -webkit-user-select: none;
 }
 
-body.touch-mode[data-mode="replay"] .touch-controls {
+body.touch-mode[data-mode="replay"] .touch-controls,
+body.touch-mode[data-mode="auto"] .touch-controls {
   display: none;
 }
 

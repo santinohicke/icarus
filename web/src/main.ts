@@ -9,6 +9,7 @@ import { Renderer } from "./render";
 import { ScoreBoard, type ScoreEntry, browserStore } from "./scores";
 import { replayFromHash, replayUrl, scenarioUrl } from "./share";
 import {
+  Autopilot,
   CONFIGS,
   type Config,
   type FlightView,
@@ -22,7 +23,8 @@ import { TelemetryCharts } from "./telemetry";
 import { TouchControls } from "./touch";
 
 type Phase = "menu" | "ready" | "running" | "paused" | "ended";
-type Mode = "fly" | "replay";
+/** Who flies: the player, a recorded replay, or the autopilot. */
+type Mode = "fly" | "replay" | "auto";
 
 const VERSION = "v0.2.0";
 const U64_MAX = (1n << 64n) - 1n;
@@ -168,6 +170,10 @@ class App {
   private sim: Simulation | null = null;
   /** The replay being watched (replay mode) or null. */
   private player: ReplayPlayer | null = null;
+  /** The autopilot flying the live run (auto mode) or null. */
+  private autopilot: Autopilot | null = null;
+  /** The autopilot's last commands, for the HUD. */
+  private autoInput: [number, number, number] = [0, Q_CENTER, Q_CENTER];
   private speedIndex = 0;
   /** Scenario to return to when leaving a replay. */
   private lastScenario: { config: Config; seed: bigint };
@@ -326,6 +332,8 @@ class App {
     this.sim = null;
     this.player?.dispose();
     this.player = null;
+    this.autopilot?.dispose();
+    this.autopilot = null;
   }
 
   private setPhase(phase: Phase): void {
@@ -357,15 +365,21 @@ class App {
 
   private restart(): void {
     if (this.mode === "replay") this.replayAgain();
-    else this.newRun(this.lastScenario.config, this.lastScenario.seed);
+    else this.newRun(this.lastScenario.config, this.lastScenario.seed, this.mode === "auto");
   }
 
-  private newRun(config: Config, seed: bigint): void {
+  /** A new run of `config` with `seed`, flown by the player or (auto) the autopilot. */
+  private newRun(config: Config, seed: bigint, auto = false): void {
     this.menu.hide();
     this.disposeFlights();
     const sim = new Simulation(config, seed);
+    // Built before anything is switched to auto mode, so a failure cannot
+    // leave a run labelled AUTOPILOT that the keyboard actually flies.
+    const autopilot = auto ? new Autopilot(config) : null;
     this.sim = sim;
-    this.mode = "fly";
+    this.autopilot = autopilot;
+    this.mode = autopilot !== null ? "auto" : "fly";
+    this.autoInput = [sim.info.initial_throttle_level, Q_CENTER, Q_CENTER];
     this.lastScenario = { config, seed };
     this.controls.input.reset(sim.info.initial_throttle_level, minRunningLevel(sim.info.throttle_cutoff));
     this.lastRcs = Q_CENTER;
@@ -374,7 +388,8 @@ class App {
     this.setPhase("ready");
     this.updateChrome();
     window.history.replaceState(null, "", scenarioUrl(window.location.href, config, seed));
-    this.showReady();
+    if (auto) this.run();
+    else this.showReady();
   }
 
   /** Starts watching a replay string. Returns false (with a message) if it is invalid. */
@@ -384,7 +399,7 @@ class App {
       player = new ReplayPlayer(encoded);
     } catch (error) {
       console.error(error);
-      if (this.mode === "replay" || this.sim === null) {
+      if (this.mode !== "fly" || this.sim === null) {
         this.newRun(this.lastScenario.config, this.lastScenario.seed);
       } else if (this.phase === "running") {
         this.pause();
@@ -439,7 +454,8 @@ class App {
     const { config, seed } = this.lastScenario;
     const replay = this.mode === "replay";
     this.seedLabel.textContent = seed.toString();
-    this.missionLabel.textContent = replay ? `REPLAY · ${MISSION[config].title}` : MISSION[config].title;
+    const prefix = replay ? "REPLAY · " : this.mode === "auto" ? "AUTOPILOT · " : "";
+    this.missionLabel.textContent = `${prefix}${MISSION[config].title}`;
     const best = this.scores.best(config);
     this.bestLabel.textContent = best === null ? "—" : String(best);
     this.pauseButton.textContent = this.phase === "paused" ? "Resume" : "Pause";
@@ -471,6 +487,8 @@ class App {
     const actions: Action[] = [["Resume", () => this.run()]];
     if (this.mode === "fly") {
       actions.push(["Retry", () => this.restart()], ["New scenario", () => this.newRun(this.lastScenario.config, randomSeed())]);
+    } else if (this.mode === "auto") {
+      actions.push(["Watch again", () => this.restart()], ["Fly it yourself", () => this.flyYourself()]);
     } else {
       actions.push(["Watch again", () => this.replayAgain()]);
     }
@@ -498,7 +516,15 @@ class App {
     }
     const sim = this.sim;
     if (sim === null) return;
-    const [throttle, gimbal, rcs] = this.controls.input.sample();
+    let throttle: number;
+    let gimbal: number;
+    let rcs: number;
+    if (this.mode === "auto" && this.autopilot !== null) {
+      this.autoInput = this.autopilot.act(sim);
+      [throttle, gimbal, rcs] = this.autoInput;
+    } else {
+      [throttle, gimbal, rcs] = this.controls.input.sample();
+    }
     this.lastRcs = rcs;
     const code = sim.step(throttle, gimbal, rcs);
     this.charts.record(sim.state);
@@ -515,9 +541,9 @@ class App {
       const total = (this.player.totalTicks * view.info.dt).toFixed(1);
       this.replayLabel.textContent = `REPLAY · T+${view.state.time.toFixed(1)} / ${total} s`;
     } else {
-      const level = this.controls.input.throttleLevel;
+      const level = this.mode === "auto" ? this.autoInput[0] : this.controls.input.throttleLevel;
       this.hud.update(view.state, view.info, level, this.lastRcs);
-      this.touch.sync(level);
+      if (this.mode === "fly") this.touch.sync(level);
     }
     if (this.phase === "running") {
       const s = view.state;
@@ -563,6 +589,27 @@ class App {
     } catch (error) {
       console.error(error);
     }
+    if (this.mode === "auto") {
+      // The autopilot's landings never count for the player's scores or unlocks.
+      const actions: Action[] = [
+        ["Watch again", () => this.restart()],
+        ["Fly it yourself", () => this.flyYourself()],
+      ];
+      if (replay !== null) {
+        const link = replayUrl(window.location.href, replay);
+        actions.push(["Share replay", (button) => void this.copy(button, link, "Replay link")]);
+      }
+      actions.push(["Main menu", () => this.showMenu()]);
+      this.showCard(
+        landed ? `AUTOPILOT · LANDED · ${sim.score} pts` : "AUTOPILOT · MISSION FAILED",
+        lines,
+        actions,
+        "The autopilot is a cascaded PID written in Rust and running here as WebAssembly. It only sees noisy, delayed sensors.",
+        landed ? "success" : "failure",
+      );
+      return;
+    }
+
     if (landed) this.progress.add(sim.config);
     if (landed && replay !== null) {
       const rank = this.scores.add({
@@ -587,6 +634,11 @@ class App {
     }
     actions.push(["Main menu", () => this.showMenu()]);
     this.showCard(landed ? `LANDED · ${sim.score} pts` : "MISSION FAILED", lines, actions, undefined, landed ? "success" : "failure");
+  }
+
+  /** The same scenario, flown by the player. */
+  private flyYourself(): void {
+    this.newRun(this.lastScenario.config, this.lastScenario.seed);
   }
 
   private async copy(button: HTMLButtonElement, text: string, label: string): Promise<void> {
@@ -649,6 +701,7 @@ class App {
       lines,
       [
         ["Launch (Space)", () => this.run()],
+        ["Watch autopilot", () => this.newRun(sim.config, sim.seed, true)],
         ["Main menu", () => this.showMenu()],
       ],
       undefined,
