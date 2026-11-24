@@ -56,7 +56,7 @@ fn telemetry_dict<'py>(py: Python<'py>, sim: &Sim) -> PyResult<Bound<'py, PyDict
 /// One landing episode.
 ///
 /// Args:
-///     config: ``"easy"`` or ``"realistic"``.
+///     config: a configuration name, see ``configs()``.
 ///     seed: episode seed (initial conditions, wind, sensor noise, faults).
 #[pyclass(module = "icarus", name = "Sim")]
 pub struct PySim {

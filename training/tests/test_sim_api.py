@@ -21,7 +21,7 @@ def scripted(tick: int) -> tuple[int, int, int]:
 def test_module_metadata() -> None:
     assert icarus.PHYSICS_VERSION >= 1
     assert icarus.REPLAY_FORMAT_VERSION >= 1
-    assert icarus.configs() == ["easy", "realistic"]
+    assert icarus.configs() == ["easy", "realistic", "training", "crosswind", "storm", "engine_out"]
     assert "landed" in icarus.OUTCOMES
     assert len(icarus.TELEMETRY_FIELDS) == len(set(icarus.TELEMETRY_FIELDS))
     assert icarus.outcome_from_code(1) == "landed"

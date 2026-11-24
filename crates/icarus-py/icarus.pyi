@@ -9,7 +9,7 @@ TELEMETRY_FIELDS: Final[list[str]]
 OUTCOMES: Final[list[str]]
 
 def configs() -> list[str]:
-    """Names of the built-in vehicle configurations."""
+    """Names of the built-in configurations: easy, realistic, training, crosswind, storm, engine_out."""
 
 def outcome_from_code(code: int) -> str | None:
     """Name of an outcome code (``None`` for 0 or unknown codes)."""

@@ -33,11 +33,8 @@ const VEHICLE_INFO_FIELDS: [&str; 18] = [
 ];
 
 fn parse_config(name: &str) -> Result<VehicleConfig, JsError> {
-    VehicleConfig::from_name(name).ok_or_else(|| {
-        JsError::new(&format!(
-            "unknown vehicle configuration {name:?} (expected \"easy\" or \"realistic\")"
-        ))
-    })
+    VehicleConfig::from_name(name)
+        .ok_or_else(|| JsError::new(&format!("unknown vehicle configuration {name:?}")))
 }
 
 fn vehicle_info(sim: &Sim) -> Vec<f64> {
@@ -77,7 +74,7 @@ pub struct WasmSim {
 
 #[wasm_bindgen]
 impl WasmSim {
-    /// Starts a run. `config` is `"easy"` or `"realistic"`; `seed` is a
+    /// Starts a run. `config` is a configuration name (`"easy"`, `"storm"`, ...); `seed` is a
     /// `BigInt` on the JS side.
     #[wasm_bindgen(constructor)]
     pub fn new(config: &str, seed: u64) -> Result<WasmSim, JsError> {

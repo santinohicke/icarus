@@ -32,17 +32,46 @@ pub enum VehicleConfig {
     Easy,
     /// Cannot hover; hoverslam required.
     Realistic,
+    /// Easy vehicle, low and slow, almost no wind: the first lesson.
+    Training,
+    /// Easy vehicle in strong crosswind and gusts, on a narrower pad.
+    Crosswind,
+    /// Realistic vehicle in a storm, with laggier sensors.
+    Storm,
+    /// Realistic vehicle with a guaranteed failure: stuck gimbal or thrust loss.
+    EngineOut,
 }
 
 impl VehicleConfig {
     /// All configurations, in identifier order.
-    pub const ALL: [VehicleConfig; 2] = [VehicleConfig::Easy, VehicleConfig::Realistic];
+    pub const ALL: [VehicleConfig; 6] = [
+        VehicleConfig::Easy,
+        VehicleConfig::Realistic,
+        VehicleConfig::Training,
+        VehicleConfig::Crosswind,
+        VehicleConfig::Storm,
+        VehicleConfig::EngineOut,
+    ];
+
+    /// The campaign, in order of difficulty.
+    pub const CAMPAIGN: [VehicleConfig; 6] = [
+        VehicleConfig::Training,
+        VehicleConfig::Easy,
+        VehicleConfig::Crosswind,
+        VehicleConfig::Realistic,
+        VehicleConfig::Storm,
+        VehicleConfig::EngineOut,
+    ];
 
     /// Stable numeric identifier (used in replays).
     pub const fn id(self) -> u8 {
         match self {
             VehicleConfig::Easy => 0,
             VehicleConfig::Realistic => 1,
+            VehicleConfig::Training => 2,
+            VehicleConfig::Crosswind => 3,
+            VehicleConfig::Storm => 4,
+            VehicleConfig::EngineOut => 5,
         }
     }
 
@@ -51,15 +80,23 @@ impl VehicleConfig {
         match id {
             0 => Some(VehicleConfig::Easy),
             1 => Some(VehicleConfig::Realistic),
+            2 => Some(VehicleConfig::Training),
+            3 => Some(VehicleConfig::Crosswind),
+            4 => Some(VehicleConfig::Storm),
+            5 => Some(VehicleConfig::EngineOut),
             _ => None,
         }
     }
 
-    /// Lower-case name (`"easy"`, `"realistic"`).
+    /// Lower-case name (`"easy"`, `"realistic"`, `"training"`, ...).
     pub const fn name(self) -> &'static str {
         match self {
             VehicleConfig::Easy => "easy",
             VehicleConfig::Realistic => "realistic",
+            VehicleConfig::Training => "training",
+            VehicleConfig::Crosswind => "crosswind",
+            VehicleConfig::Storm => "storm",
+            VehicleConfig::EngineOut => "engine_out",
         }
     }
 
@@ -73,6 +110,10 @@ impl VehicleConfig {
         match self {
             VehicleConfig::Easy => Params::easy(),
             VehicleConfig::Realistic => Params::realistic(),
+            VehicleConfig::Training => Params::training(),
+            VehicleConfig::Crosswind => Params::crosswind(),
+            VehicleConfig::Storm => Params::storm(),
+            VehicleConfig::EngineOut => Params::engine_out(),
         }
     }
 }
@@ -462,6 +503,64 @@ impl Params {
         }
     }
 
+    /// The `training` configuration: the easy vehicle, lower, slower and
+    /// almost windless, with a wide pad.
+    pub fn training() -> Self {
+        let mut p = Self::easy();
+        p.wind.mean = Range::symmetric(1.0);
+        p.wind.turbulence_sigma = 0.3;
+        p.start.altitude = Range::new(400.0, 500.0);
+        p.start.vertical_speed = Range::new(-25.0, -20.0);
+        p.start.horizontal_speed = Range::symmetric(2.0);
+        p.start.horizontal_offset = Range::symmetric(30.0);
+        p.start.tilt = Range::symmetric(1.0 * DEG);
+        p.start.angular_rate = Range::symmetric(0.005);
+        p.landing.pad_half_width = 50.0;
+        p
+    }
+
+    /// The `crosswind` configuration: the easy vehicle in strong wind and
+    /// frequent gusts, further from a narrower pad.
+    pub fn crosswind() -> Self {
+        let mut p = Self::easy();
+        p.wind.mean = Range::symmetric(10.0);
+        p.wind.turbulence_sigma = 2.5;
+        p.wind.gust_rate = 1.0 / 10.0;
+        p.wind.gust_amplitude = Range::new(4.0, 8.0);
+        p.wind.gust_duration = Range::new(2.0, 5.0);
+        p.start.horizontal_offset = Range::symmetric(150.0);
+        p.landing.pad_half_width = 30.0;
+        p
+    }
+
+    /// The `storm` configuration: the realistic vehicle in a storm, with
+    /// twice the sensor delay.
+    pub fn storm() -> Self {
+        let mut p = Self::realistic();
+        p.wind.mean = Range::symmetric(14.0);
+        p.wind.turbulence_sigma = 3.0;
+        p.wind.gust_rate = 1.0 / 8.0;
+        p.wind.gust_amplitude = Range::new(6.0, 12.0);
+        p.wind.gust_duration = Range::new(2.0, 5.0);
+        p.sensors.delay_ticks = 6;
+        p
+    }
+
+    /// The `engine_out` configuration: the realistic vehicle with a failure
+    /// in every episode, during the descent: a slightly stuck gimbal (to be
+    /// cancelled with RCS) or a loss of thrust.
+    pub fn engine_out() -> Self {
+        let mut p = Self::realistic();
+        p.faults = FaultParams {
+            probability: 1.0,
+            gimbal_stuck_share: 0.5,
+            trigger_time: Range::new(4.0, 10.0),
+            stuck_angle: Range::new(0.3 * DEG, 0.8 * DEG),
+            thrust_factor: Range::new(0.82, 0.9),
+        };
+        p
+    }
+
     /// Minimum thrust-to-weight ratio at a given total mass.
     pub fn twr_min(&self, mass: f64) -> f64 {
         self.vehicle.min_throttle * self.vehicle.max_thrust / (mass * self.environment.gravity)
@@ -701,6 +800,35 @@ mod tests {
         assert!(
             p.twr_max(heaviest) > 1.3,
             "needs margin to decelerate when full"
+        );
+    }
+
+    #[test]
+    fn campaign_levels_keep_their_vehicle_class() {
+        for c in [VehicleConfig::Training, VehicleConfig::Crosswind] {
+            let p = c.params();
+            let heaviest = p.vehicle.dry_mass + p.start.propellant.max;
+            assert!(p.twr_min(heaviest) < 1.0, "{} must hover", c.name());
+        }
+        for c in [VehicleConfig::Storm, VehicleConfig::EngineOut] {
+            let p = c.params();
+            assert!(
+                p.twr_min(p.vehicle.dry_mass) > 1.0,
+                "{} must not hover",
+                c.name()
+            );
+        }
+        assert_eq!(VehicleConfig::EngineOut.params().faults.probability, 1.0);
+        // Engine-out must stay survivable: thrust still beats weight when full.
+        let p = Params::engine_out();
+        let heaviest = p.vehicle.dry_mass + p.start.propellant.max;
+        assert!(p.twr_max(heaviest) * p.faults.thrust_factor.min > 1.5);
+        let mut ids: Vec<u8> = VehicleConfig::CAMPAIGN.iter().map(|c| c.id()).collect();
+        ids.sort_unstable();
+        assert_eq!(
+            ids,
+            (0..6).collect::<Vec<u8>>(),
+            "campaign covers every config once"
         );
     }
 
