@@ -129,8 +129,8 @@ class App {
     const coarse = window.matchMedia("(pointer: coarse)");
     this.setTouch(coarse.matches);
     coarse.addEventListener("change", (e) => this.setTouch(e.matches));
-    // Charts start open on wide screens without touch controls in the way.
-    this.setCharts(window.matchMedia("(min-width: 1100px)").matches && !coarse.matches);
+    // Charts start hidden (they distract from flying); T or the button opens them.
+    this.setCharts(false);
     // On failure, watch() loads the scenario itself and shows the error.
     if (replay === null) this.newRun(config, seed);
     else this.watch(replay);
