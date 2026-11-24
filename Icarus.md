@@ -201,7 +201,7 @@ Implemented once in Rust so that training, evaluation and the web all run the id
 
 | Controller | Role |
 | --- | --- |
-| Cascaded PID | Simple baseline, built first: position → desired angle → gimbal; vertical velocity → throttle. On `realistic` it needs an ignition trigger (light the engine when the stopping distance at ~80% throttle reaches the altitude), since it cannot hover. Validated on `easy` first |
+| Cascaded PID | Simple baseline, built first: position → desired angle → gimbal; vertical velocity → throttle. On `realistic` it needs an ignition trigger (light the engine when the stopping distance at ~80% throttle reaches the altitude), since it cannot hover. Validated on `easy` first. **Implemented (stage 3):** it sees only the delayed, noisy sensors plus its own engine state and propellant gauge; a complementary filter and delay compensation clean the measurements, a disturbance observer learns drag, wind and lost thrust, the descent follows a speed profile (a blended braking profile for hoverslams, with a cut-off in the last centimeters), the lateral PD is scheduled by time to go, and an attitude PID drives the gimbal and the RCS. Gains were random-searched on seeds ≥ 1,000,000; results in `results/pid.md` |
 | LQR | Optimal baseline around hover, `easy` config only. Gains computed offline (Python, `scipy.linalg.solve_continuous_are`) and stored in config |
 | Convex guidance + tracking | Fuel-optimal powered-descent trajectory solved as a convex problem (second-order cone program, lossless convexification), tracked by a feedback controller. Valid for `realistic` |
 | MPC | Re-solves the convex problem in a receding horizon with `clarabel` (pure-Rust conic solver), behind an `mpc` Cargo feature that is off by default, so the solver stays out of the WASM bundle until it is needed. The strongest classical baseline. Solves on a tick-based schedule (every N ticks, fixed apply latency, iteration cap), never on wall-clock deadlines |
@@ -211,6 +211,23 @@ Implemented once in Rust so that training, evaluation and the web all run the id
 **Order of work:** PID → agent → LQR / guidance / MPC. The MPC never blocks the agent, but a strong baseline **must** be finished before the results are written up: the claim "beats a strong classical controller" depends on it. Time-boxed fallback: if the MPC isn't working after its stage, the report uses convex guidance + tracking as the strong baseline and states the limitation explicitly.
 
 ### Evaluation
+
+Implemented in stage 3: `icarus_core::eval` defines the scenarios, `icarus.evaluate` runs them in Rust (GIL released) and `training/evaluate.py` writes `results/<controller>.md` and `.json`. Evaluation seeds start at 0; controllers are tuned on seeds ≥ 1,000,000.
+
+PID results (500 episodes per row, Wilson 95% CI), the bar the agent has to beat:
+
+| Scenario | `easy` | `realistic` |
+| --- | --- | --- |
+| Nominal | 100% | 97.0% (95.1–98.2) |
+| Initial tilt 30–35° | 100% | 91.4% (88.6–93.6) |
+| Strong gusts | 60.0% (55.6–64.2) | 64.2% (59.9–68.3) |
+| Delayed sensors (10 ticks) | 100% | 96.8% (94.9–98.0) |
+| Gimbal stuck at 1° | 44.8% (40.5–49.2) | 18.0% (14.9–21.6) |
+| Thrust −20% | 100% | 94.8% (92.5–96.4) |
+| Out-of-distribution | 5.6% (3.9–8.0) | 15.0% (12.1–18.4) |
+
+The stuck gimbal is where the PID is weakest. On `realistic` the torque of a 1° deflection at hoverslam thrust exceeds what the RCS can cancel, so surviving needs a trade-off between braking and attitude that a fixed-gain controller does not make. That is exactly the kind of regime where the agent is expected to win.
+
 
 A fixed battery of scenarios with known seeds, run identically for every controller:
 
@@ -329,7 +346,8 @@ icarus/
 │   │   │   ├── sim.rs            # the simulation loop: one tick = one step
 │   │   │   ├── replay.rs         # per-tick inputs, events, RLE + base64url
 │   │   │   ├── env.rs            # observation, reward, termination (stage 4)
-│   │   │   ├── control/          # pid.rs, lqr.rs, guidance.rs, mpc.rs (stages 3 and 6)
+│   │   │   ├── control/          # pid.rs (stage 3); lqr.rs, guidance.rs, mpc.rs (stage 6)
+│   │   │   ├── eval.rs           # evaluation scenarios and episode summaries
 │   │   │   └── policy.rs         # MLP forward pass + normalization (stage 5)
 │   │   └── tests/
 │   │       ├── convergence.rs    # halving dt reduces the error ~16x (4th order, smooth case)
@@ -412,7 +430,7 @@ icarus/
 | --- | --- | --- |
 | 1. Core + first playable | **Week 1, vertical slice:** core dynamics (RK4, gravity, gimballed thrust, mass flow) → WASM binding → Canvas page you can land with the keyboard at 60 Hz. If landing by hand isn't fun or the physics feels artificial, fix it now: tuning the RL reward on top of bad physics is a nightmare. **Then:** the complete physics model (aerodynamics, RCS, wind, faults, sensors, RNG streams, touchdown detection, outcomes and score, both vehicle configs), replay format, Python binding, bit-exact parity test (native, Python, WASM), CI | ✅ Done |
 | 2. Playable web | Telemetry (uPlot), touch controls, difficulty selector, failure buttons, local high scores, replay links in the URL hash, Cloudflare Pages deploy, Cloudflare Web Analytics | ✅ Done |
-| 3. PID baseline | Cascaded PID in Rust (with the ignition trigger for `realistic`), evaluation battery; validates the environment on `easy` first | 1 week |
+| 3. PID baseline | Cascaded PID in Rust (with the ignition trigger for `realistic`), evaluation battery; validates the environment on `easy` first | ✅ Done |
 | 4. Agent | `env` module in the core, Rust vectorized env, PPO, curriculum, domain randomization, failures, normalization export | 2–3 weeks |
 | 5. AI on the web | Hand-written MLP inference in Rust/WASM, AI mode and duel mode | 1 week |
 | 6. Strong baselines | LQR (`easy`), convex guidance and MPC with `clarabel` — only once the agent lands. Time-boxed; required before stages 7–8 (fallback: convex guidance + tracking) | 1–2 weeks |

@@ -8,7 +8,15 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 
 **Play it: <https://icarus-ai.pages.dev/>**
 
-**Status: Stages 1 and 2 complete** (core, first playable, playable web app). The classical baselines and the reinforcement-learning agent are the next stages.
+**Status: Stages 1–3 complete** (core, playable web app, PID baseline and evaluation battery). The reinforcement-learning agent is next.
+
+## What is in Stage 3 (the classical baseline)
+
+- A cascaded PID autopilot in Rust (`icarus_core::control`). It sees only what a flight computer would: delayed, noisy sensors, its engine state and its propellant gauge. It uses a complementary filter, delay compensation, a disturbance observer (drag, wind, lost thrust), a descent speed profile with an ignition trigger for hoverslams, a time-to-go scheduled lateral PD and an attitude PID driving the gimbal and the RCS.
+- Bit-identical decisions natively, in Python and in WebAssembly: the parity goldens include PID flights, and every checker re-runs the controller and requires the same command at every tick.
+- An evaluation battery (`icarus_core::eval`, `training/evaluate.py`): nominal, 30–35° initial tilt, strong gusts, delayed sensors, a stuck gimbal, a thrust loss and out-of-distribution, with Wilson 95% confidence intervals. Results: [results/pid.md](results/pid.md).
+- In the web game, every briefing has a **Watch autopilot** button.
+- Gains were tuned by random search (`cargo run --release -p icarus-core --example pid_tune`) on seeds the evaluation never uses.
 
 ## What is in Stage 2 (the web app)
 
@@ -86,6 +94,16 @@ sim = icarus.Sim("realistic", seed=42)
 while sim.step(throttle=-1.0) is None:   # engine off: free fall
     pass
 print(sim.outcome, sim.score, sim.telemetry_dict()["contact_vy"])
+
+# The PID autopilot, and the evaluation battery
+sim, pid = icarus.Sim("realistic", 42), icarus.Controller("pid", "realistic")
+while not sim.done:
+    sim.step_quantized(*pid.act(sim))
+rows = icarus.evaluate("pid", "realistic", "gimbal_stuck", list(range(100)))
+```
+
+```sh
+python training/evaluate.py --controller pid --seeds 500   # writes results/pid.md and pid.json
 ```
 
 ## Tests
@@ -93,7 +111,7 @@ print(sim.outcome, sim.score, sim.telemetry_dict()["contact_vy"])
 ```sh
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace                       # physics, convergence, analytic, determinism, replays, goldens
-cd training && python -m pytest              # Python API + golden parity
+cd training && python -m pytest              # Python API, controllers, evaluation, golden parity
 node parity/verify_wasm.mjs                  # WebAssembly matches the goldens bit for bit
 cd web && npm test                           # loop, controls, frame-rate independence, playability, scores, links, replays
 ```
