@@ -71,18 +71,19 @@ const MISSION: Record<Config, { title: string; subtitle: string; blurb: string }
   },
 };
 
-const UNLOCK_KEY = "icarus.landed.v1";
+const LANDED_KEY = "icarus.landed.v1";
 
 /**
  * Levels landed at least once. Kept apart from the scores (which are tied to
- * the physics version) and also in memory, so unlocks work without storage.
+ * the physics version) and also in memory, so it works without storage. Every
+ * level can be played; this only marks progress and suggests the next one.
  */
 class Progress {
   private readonly landed = new Set<Config>();
 
   constructor() {
     try {
-      const parsed: unknown = JSON.parse(window.localStorage.getItem(UNLOCK_KEY) ?? "[]");
+      const parsed: unknown = JSON.parse(window.localStorage.getItem(LANDED_KEY) ?? "[]");
       if (Array.isArray(parsed)) for (const c of parsed) if (isConfig(c)) this.landed.add(c);
     } catch {
       // storage unavailable or corrupt: start from nothing
@@ -96,18 +97,11 @@ class Progress {
   add(config: Config): void {
     this.landed.add(config);
     try {
-      window.localStorage.setItem(UNLOCK_KEY, JSON.stringify([...this.landed]));
+      window.localStorage.setItem(LANDED_KEY, JSON.stringify([...this.landed]));
     } catch {
-      // keep the in-memory unlock
+      // keep the in-memory record
     }
   }
-}
-
-/** Level i is unlocked once level i − 1 has been landed. */
-function unlocked(index: number, landed: (config: Config) => boolean): boolean {
-  if (index === 0) return true;
-  const previous = CONFIGS[index - 1];
-  return previous !== undefined && landed(previous);
 }
 
 const OUTCOME_TEXT: Record<string, string> = {
@@ -349,17 +343,17 @@ class App {
     this.hideOverlay();
     this.updateChrome();
     window.history.replaceState(null, "", new URL(window.location.pathname, window.location.href));
-    const landed = (config: Config): boolean => this.progress.has(config) || this.scores.best(config) !== null;
     this.menu.show(
-      CONFIGS.map((config, i) => ({
-        config,
-        title: MISSION[config].title,
-        subtitle: MISSION[config].subtitle,
-        best: this.scores.best(config),
-        locked: !unlocked(i, landed)
-          ? `LAND ${MISSION[CONFIGS[i - 1] ?? config].title} TO UNLOCK`
-          : null,
-      })),
+      CONFIGS.map((config) => {
+        const best = this.scores.best(config);
+        return {
+          config,
+          title: MISSION[config].title,
+          subtitle: MISSION[config].subtitle,
+          best,
+          landed: best !== null || this.progress.has(config),
+        };
+      }),
     );
   }
 
@@ -590,7 +584,7 @@ class App {
       console.error(error);
     }
     if (this.mode === "auto") {
-      // The autopilot's landings never count for the player's scores or unlocks.
+      // The autopilot's landings never count for the player's scores or progress.
       const actions: Action[] = [
         ["Watch again", () => this.restart()],
         ["Fly it yourself", () => this.flyYourself()],

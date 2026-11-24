@@ -105,7 +105,7 @@ Both configurations use the same airframe; they differ in engine, starting condi
 
 Development and first training happen on `easy`; the main research results use `realistic`.
 
-**Campaign levels.** The web game offers six levels, unlocked in order by landing the previous one. The four extra levels reuse the two vehicles and only change the scenario:
+**Campaign levels.** The web game offers six levels, all playable from the start; the menu marks the ones landed and suggests the next. The four extra levels reuse the two vehicles and only change the scenario:
 
 | Level | Vehicle | What changes |
 | --- | --- | --- |

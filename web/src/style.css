@@ -645,30 +645,9 @@ body[data-phase="menu"] #view {
   letter-spacing: 0.25em;
 }
 
-.menu-item.locked:hover .menu-line,
-.menu-item.locked:focus .menu-line {
-  width: 0;
-}
-
-.menu-item.locked {
-  cursor: default;
-  color: #59616d;
-}
-
 .menu-level .menu-index {
   align-self: flex-start;
   margin-top: 8px;
-}
-
-.menu-item.locked .menu-index,
-.menu-item.locked .menu-level-sub {
-  color: #474e58;
-}
-
-.menu-level-locked {
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  color: #8a919b;
 }
 
 .menu-level-sub {
