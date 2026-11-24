@@ -313,6 +313,227 @@ kbd {
   margin-top: 14px;
 }
 
+/* --- Telemetry charts --------------------------------------------------- */
+
+.charts {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  width: 320px;
+  max-height: calc(100% - 110px);
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.charts[hidden] {
+  display: none;
+}
+
+.chart .u-title {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  text-align: left;
+  padding-left: 4px;
+}
+
+/* --- Failure injection ---------------------------------------------------- */
+
+.faults {
+  position: fixed;
+  right: 16px;
+  bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 95, 95, 0.35);
+  border-radius: 6px;
+}
+
+.faults[hidden] {
+  display: none;
+}
+
+.faults-title {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--bad);
+}
+
+.faults button:hover {
+  border-color: var(--bad);
+}
+
+/* --- Replay bar ----------------------------------------------------------- */
+
+.replay-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 36px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.replay-bar[hidden] {
+  display: none;
+}
+
+body[data-mode="replay"] .help {
+  display: none;
+}
+
+/* --- Score table on the briefing card ------------------------------------- */
+
+.scores {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.scores-title {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.scores ol {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.scores li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.9;
+  font-size: 12px;
+}
+
+.scores li button {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+/* --- Touch controls ------------------------------------------------------- */
+
+.touch-controls {
+  display: none;
+}
+
+body.touch-mode .touch-controls {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 12px 14px;
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.touch-mode[data-mode="replay"] .touch-controls {
+  display: none;
+}
+
+body.touch-mode .help {
+  display: none;
+}
+
+.touch-pad {
+  display: grid;
+  grid-template-columns: repeat(2, 76px);
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.touch-btn,
+.touch-cut {
+  height: 52px;
+  font-size: 12px;
+  background: rgba(30, 44, 70, 0.75);
+  touch-action: none;
+}
+
+.touch-btn:active {
+  background: rgba(95, 212, 255, 0.3);
+}
+
+.touch-throttle {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.touch-label {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+
+.touch-track {
+  position: relative;
+  width: 64px;
+  height: min(38vh, 240px);
+  background: rgba(30, 44, 70, 0.6);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.touch-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to top, rgba(255, 138, 92, 0.75), rgba(242, 179, 92, 0.5));
+}
+
+.touch-cut {
+  width: 64px;
+  border-color: rgba(255, 95, 95, 0.6);
+  color: var(--bad);
+}
+
+/* With touch controls the failure buttons move up, clear of the throttle,
+   and the charts move below them. */
+body.touch-mode .faults {
+  bottom: auto;
+  top: 60px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  max-width: 220px;
+}
+
+body.touch-mode .charts {
+  top: 170px;
+  max-height: calc(100% - 170px - min(38vh, 240px) - 80px);
+}
+
 @media (max-width: 640px) {
   .topbar {
     gap: 8px;
@@ -342,5 +563,28 @@ kbd {
 
   .help {
     display: none;
+  }
+
+  .charts {
+    top: auto;
+    bottom: 10px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-height: 40%;
+  }
+
+  /* Phones in touch mode: charts take the HUD's place under the top bar. */
+  body.touch-mode .charts {
+    top: 96px;
+    bottom: auto;
+    max-height: 32%;
+  }
+
+  body.touch-mode .faults {
+    top: auto;
+    bottom: calc(min(38vh, 240px) + 90px);
+    right: 12px;
+    max-width: 160px;
   }
 }

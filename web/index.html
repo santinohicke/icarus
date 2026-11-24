@@ -20,6 +20,8 @@
       </div>
       <div class="actions">
         <span class="seed" title="Scenario seed">SEED <span id="seed">—</span></span>
+        <span class="seed" title="Your best score on this difficulty (stored in this browser)">BEST <span id="best">—</span></span>
+        <button type="button" id="btn-charts" title="Telemetry charts (T)" aria-pressed="false">Charts</button>
         <button type="button" id="btn-pause" title="Pause (P)">Pause</button>
         <button type="button" id="btn-restart" title="Restart this scenario (R)">Retry</button>
         <button type="button" id="btn-new" title="New random scenario (N)">New</button>
@@ -27,6 +29,24 @@
     </header>
 
     <aside class="hud" id="hud" aria-live="off"></aside>
+
+    <aside class="charts" id="charts" aria-label="Telemetry charts" hidden></aside>
+
+    <aside class="faults" id="faults" aria-label="Inject a failure" hidden>
+      <div class="faults-title">INJECT FAILURE</div>
+      <button type="button" data-fault="gimbal" title="Jam the gimbal where it is (7)">Gimbal stuck</button>
+      <button type="button" data-fault="thrust" title="Lose 30% of the remaining thrust (8)">Thrust −30%</button>
+      <button type="button" data-fault="gust-left" title="12 m/s gust from the right (9)">Gust ←</button>
+      <button type="button" data-fault="gust-right" title="12 m/s gust from the left (0)">Gust →</button>
+    </aside>
+
+    <div class="replay-bar" id="replay-bar" hidden>
+      <span id="replay-label">REPLAY</span>
+      <button type="button" id="btn-speed" title="Playback speed">1×</button>
+      <button type="button" id="btn-exit-replay">Fly this scenario</button>
+    </div>
+
+    <div class="touch-controls" id="touch"></div>
 
     <div class="overlay" id="overlay" hidden>
       <div class="card" id="overlay-card" role="dialog" aria-modal="true" aria-labelledby="overlay-title" aria-live="polite"></div>
@@ -38,6 +58,8 @@
       <span><kbd>Q</kbd><kbd>E</kbd> RCS</span>
       <span><kbd>X</kbd> cut engine</span>
       <span><kbd>Z</kbd> full throttle</span>
+      <span><kbd>T</kbd> charts</span>
+      <span><kbd>7</kbd>–<kbd>0</kbd> failures</span>
       <span><kbd>P</kbd> pause</span>
       <span><kbd>R</kbd> retry</span>
     </footer>
