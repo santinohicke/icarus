@@ -1,0 +1,18 @@
+[package]
+name = "icarus-core"
+description = "Deterministic 2D rocket-landing physics shared by the Python and WebAssembly bindings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+libm.workspace = true
+base64.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json = "1"
