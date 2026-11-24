@@ -1,0 +1,12 @@
+{
+ "format": 1,
+ "cases": [
+  "easy_scripted",
+  "realistic_scripted",
+  "realistic_events",
+  "easy_controller",
+  "realistic_fuzz",
+  "easy_relight",
+  "easy_hard_landing"
+ ]
+}
