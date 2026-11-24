@@ -12,4 +12,6 @@ dev = ["pytest>=8", "ruff>=0.6", "maturin>=1.9.4,<2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Lets the tests import the scripts in training/ (evaluate.py).
+pythonpath = ["."]
 addopts = "-ra --strict-markers"

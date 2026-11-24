@@ -66,6 +66,10 @@ def test_native_module_matches_golden(path: Path) -> None:
     assert golden["telemetry_fields"] == icarus.TELEMETRY_FIELDS
 
     sim = icarus.Sim(golden["config"], int(golden["seed"]))
+    # Goldens flown by a controller: it must make the recorded decision every tick.
+    controller = None
+    if "controller" in golden:
+        controller = icarus.Controller(golden["controller"], golden["config"])
     samples = {s["tick"]: s["telemetry"] for s in golden["samples"]}
     events = golden["events"]
 
@@ -86,6 +90,8 @@ def test_native_module_matches_golden(path: Path) -> None:
             for event in events:
                 if event["tick"] == tick:
                     apply_event(sim, event)
+            if controller is not None:
+                assert controller.act(sim) == (q0, q1, q2), f"controller differs at tick {tick}"
             sim.step_quantized(q0, q1, q2)
             tick += 1
             telemetry = sim.telemetry()
