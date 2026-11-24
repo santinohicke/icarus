@@ -6,18 +6,18 @@ A 2D landing simulator for a reusable rocket first stage. The physics is written
 
 The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 
-**Play it: <https://santinohicke.github.io/icarus/>**
+**Play it: <https://icarus-ai.pages.dev/>**
 
 **Status: Stages 1 and 2 complete** (core, first playable, playable web app). The classical baselines and the reinforcement-learning agent are the next stages.
 
 ## What is in Stage 2 (the web app)
 
-- Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt (<kbd>T</kbd>).
+- Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt. Hidden by default; <kbd>T</kbd> opens them.
 - Touch controls: a throttle bar, gimbal and RCS buttons and an engine cut-off, switched on by the first touch.
 - Failure injection mid-flight: stuck gimbal, thrust loss and gusts (buttons or keys <kbd>7</kbd>–<kbd>0</kbd>). They are recorded in the replay.
 - Local high scores per difficulty (localStorage, validated on load), each with a "Watch" button.
 - Shareable links: a replay travels in the URL hash (`#replay=...`, never sent to a server) and plays back at 1×/2×/4×; a challenge link (`?config=...&seed=...`) opens the same scenario.
-- Deployed to GitHub Pages by CI, only after the WebAssembly build matches the golden trajectories bit for bit.
+- Deployed to Cloudflare Pages (with Cloudflare Web Analytics) by CI, only after the WebAssembly build matches the golden trajectories bit for bit.
 
 ## What is in Stage 1
 

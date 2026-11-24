@@ -226,8 +226,8 @@ A fixed battery of scenarios with known seeds, run identically for every control
 - **Fixed-timestep loop:** the simulation advances in fixed 1/60 s ticks using an accumulator, decoupled from `requestAnimationFrame`, so it behaves identically on 60, 120 and 144 Hz screens. Catch-up is capped (at most a few ticks per frame) and the simulation pauses when the tab is hidden. Player inputs are recorded **per tick**, which makes every run replayable.
 - **Replays and high scores:** high scores are kept in `localStorage`. Every run can be exported/imported as a replay and shared as a link with the replay encoded in the URL hash. A replay holds a format version, a physics version, the vehicle config, the seed, the tick count, the per-tick quantized inputs and the injected events. Inputs are run-length encoded (keyboard input changes rarely, so a one-minute run is small) and base64url-encoded; analog mouse/touch input is additionally delta-encoded, and compressed with `CompressionStream` if needed. The link carries the inputs, not the score: the browser re-simulates them, so the score proves itself. A link made with a different physics version is rejected instead of silently replaying differently.
 - **Classical controllers in the browser:** PID runs live. MPC runs live only if it is fast enough in single-threaded WASM; otherwise it runs at a lower tick-based rate, or stays in native evaluation and the report while web duels use PID vs. AI.
-- **Analytics:** privacy-friendly, cookie-free analytics (e.g. GoatCounter or Plausible) to count visitors and completed runs. This is where the "N users" figure for the CV comes from.
-- **No backend:** the site is static (GitHub Pages). An online leaderboard server is an optional last stage.
+- **Analytics:** privacy-friendly, cookie-free analytics (Cloudflare Web Analytics) to count visitors. This is where the "N users" figure for the CV comes from.
+- **No backend:** the site is static (Cloudflare Pages, icarus-ai.pages.dev). An online leaderboard server is an optional last stage.
 
 ### WASM boundary
 
@@ -250,10 +250,10 @@ One `Sim` object per running simulation. JS calls `step(...)` once per tick with
 | Model export | Flat little-endian `f32` weights + JSON manifest (layer shapes, activation, normalization mean/var/eps/clip) | Trivial to load in Rust; no ONNX runtime needed for a 2-layer MLP |
 | Frontend | Vite + TypeScript, Canvas 2D | Lightweight, no heavy framework |
 | Telemetry charts | uPlot | Very fast real-time charts |
-| Analytics | GoatCounter or Plausible | Privacy-friendly usage numbers |
+| Analytics | Cloudflare Web Analytics | Privacy-friendly usage numbers |
 | Tests | `cargo test`, `pytest`, Vitest | One test level per layer |
 | CI/CD | GitHub Actions | Automated tests, parity, build and deploy |
-| Deploy | GitHub Pages (static) | Free and serverless |
+| Deploy | Cloudflare Pages (static) | Free and serverless, built-in Web Analytics |
 | Leaderboard server (optional, last) | Rust (Axum on Fly.io, or Cloudflare `workers-rs`) | Re-simulates submitted replays with `icarus-core` |
 
 ---
@@ -375,7 +375,7 @@ icarus/
 ├── server/                       # optional, last stage: Axum leaderboard
 └── .github/workflows/
     ├── ci.yml                    # cargo test + clippy + fmt, pytest, parity, web build
-    └── deploy.yml                # publishes the site to GitHub Pages
+    └── deploy.yml                # publishes the site to Cloudflare Pages
 ```
 
 ---
@@ -398,7 +398,7 @@ icarus/
 | Stage | Content | Estimated time |
 | --- | --- | --- |
 | 1. Core + first playable | **Week 1, vertical slice:** core dynamics (RK4, gravity, gimballed thrust, mass flow) → WASM binding → Canvas page you can land with the keyboard at 60 Hz. If landing by hand isn't fun or the physics feels artificial, fix it now: tuning the RL reward on top of bad physics is a nightmare. **Then:** the complete physics model (aerodynamics, RCS, wind, faults, sensors, RNG streams, touchdown detection, outcomes and score, both vehicle configs), replay format, Python binding, bit-exact parity test (native, Python, WASM), CI | ✅ Done |
-| 2. Playable web | Telemetry (uPlot), touch controls, difficulty selector, failure buttons, local high scores, replay links in the URL hash, GitHub Pages deploy. Analytics pending (needs a GoatCounter/Plausible account) | ✅ Done (except analytics) |
+| 2. Playable web | Telemetry (uPlot), touch controls, difficulty selector, failure buttons, local high scores, replay links in the URL hash, Cloudflare Pages deploy, Cloudflare Web Analytics | ✅ Done |
 | 3. PID baseline | Cascaded PID in Rust (with the ignition trigger for `realistic`), evaluation battery; validates the environment on `easy` first | 1 week |
 | 4. Agent | `env` module in the core, Rust vectorized env, PPO, curriculum, domain randomization, failures, normalization export | 2–3 weeks |
 | 5. AI on the web | Hand-written MLP inference in Rust/WASM, AI mode and duel mode | 1 week |
