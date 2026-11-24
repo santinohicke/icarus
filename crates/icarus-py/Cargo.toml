@@ -1,0 +1,26 @@
+[package]
+name = "icarus-py"
+description = "Python bindings for the Icarus simulator."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "icarus"
+crate-type = ["cdylib"]
+# Tested from Python (training/tests); a Rust test harness would need to link
+# libpython, which is fragile on CI runners.
+test = false
+doctest = false
+
+[dependencies]
+icarus-core.workspace = true
+# No `extension-module` feature: maturin >= 1.9.4 sets it up automatically,
+# which keeps `cargo clippy --workspace` able to link.
+pyo3 = { workspace = true, features = ["abi3-py311"] }
+
+[lints]
+workspace = true
