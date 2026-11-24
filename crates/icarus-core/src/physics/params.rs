@@ -503,19 +503,25 @@ impl Params {
         }
     }
 
-    /// The `training` configuration: the easy vehicle, lower, slower and
-    /// almost windless, with a wide pad.
+    /// The `training` configuration: the easy vehicle, low and slow, almost
+    /// windless, with a wide pad and forgiving touchdown limits.
     pub fn training() -> Self {
         let mut p = Self::easy();
         p.wind.mean = Range::symmetric(1.0);
         p.wind.turbulence_sigma = 0.3;
-        p.start.altitude = Range::new(400.0, 500.0);
-        p.start.vertical_speed = Range::new(-25.0, -20.0);
-        p.start.horizontal_speed = Range::symmetric(2.0);
+        // Low and slow, with no drift or tilt to start with, so a first-time
+        // player has time to find the hover throttle.
+        p.start.altitude = Range::new(150.0, 200.0);
+        p.start.vertical_speed = Range::new(-11.0, -9.0);
+        p.start.horizontal_speed = Range::fixed(0.0);
         p.start.horizontal_offset = Range::symmetric(30.0);
-        p.start.tilt = Range::symmetric(1.0 * DEG);
-        p.start.angular_rate = Range::symmetric(0.005);
+        p.start.tilt = Range::fixed(0.0);
+        p.start.angular_rate = Range::fixed(0.0);
+        // Forgiving touchdown limits (the other levels keep the strict ones).
         p.landing.pad_half_width = 50.0;
+        p.landing.max_vertical_speed = 3.0;
+        p.landing.max_horizontal_speed = 2.0;
+        p.landing.max_tilt = 10.0 * DEG;
         p
     }
 

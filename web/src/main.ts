@@ -13,6 +13,8 @@ import {
   CONFIGS,
   type Config,
   type FlightView,
+  type Telemetry,
+  type VehicleInfo,
   ReplayPlayer,
   Simulation,
   getPhysicsVersion,
@@ -38,7 +40,7 @@ const MISSION: Record<Config, { title: string; subtitle: string; blurb: string }
     title: "TRAINING",
     subtitle: "LOW · SLOW · CALM AIR",
     blurb:
-      "Your first landing. The engine is running and can throttle below the stage's weight, so you can hover. Low altitude, almost no wind, a wide pad.",
+      "Your first landing. The engine is running and can throttle below the stage's weight, so you can hover. Low and slow, almost no wind, a wide pad, and gentler touchdown limits: up to 3 m/s down.",
   },
   easy: {
     title: "EASY",
@@ -117,6 +119,27 @@ const OUTCOME_TEXT: Record<string, string> = {
   time_limit: "Ran out of time",
   diverged: "Simulation error",
 };
+
+/**
+ * What exactly went wrong, with the measured value against the limit, e.g.
+ * "Too fast: 4.2 m/s down, max 3.0". Null when there is nothing to measure.
+ */
+function failureDetail(outcome: string, s: Telemetry, info: VehicleInfo): string | null {
+  switch (outcome) {
+    case "crashed_vertical_speed":
+      return `Too fast: ${Math.abs(s.contact_vy).toFixed(1)} m/s down, max ${info.max_vertical_speed.toFixed(1)}`;
+    case "crashed_horizontal_speed":
+      return `Sliding sideways: ${Math.abs(s.contact_vx).toFixed(1)} m/s, max ${info.max_horizontal_speed.toFixed(1)}`;
+    case "crashed_tilt":
+      return `Leaning ${(Math.abs(Math.atan2(Math.sin(s.theta), Math.cos(s.theta))) / DEG).toFixed(1)}°, max ${(info.max_tilt / DEG).toFixed(0)}°`;
+    case "crashed_angular_rate":
+      return `Spinning ${(Math.abs(s.omega) / DEG).toFixed(1)}°/s, max ${(info.max_angular_rate / DEG).toFixed(1)}°/s`;
+    case "crashed_off_pad":
+      return `Missed the pad by ${Math.max(0, -s.pad_margin).toFixed(1)} m`;
+    default:
+      return null;
+  }
+}
 
 function parseSeed(text: string | null): bigint | null {
   if (text === null || !/^\d{1,20}$/.test(text)) return null;
@@ -555,8 +578,9 @@ class App {
     const landed = view.outcome === 1;
     if (landed) this.sound.land();
     else if (CRASH_CODES.has(view.outcome)) this.sound.explode();
+    const detail = failureDetail(view.outcomeName, s, view.info);
     const lines = [
-      OUTCOME_TEXT[view.outcomeName] ?? (view.outcomeName || "Replay ended before touchdown"),
+      detail ?? OUTCOME_TEXT[view.outcomeName] ?? (view.outcomeName || "Replay ended before touchdown"),
       `Leg contact: vertical ${s.contact_vy.toFixed(2)} m/s · sideways ${s.contact_vx.toFixed(2)} m/s · ${Math.round(s.propellant)} kg left`,
     ];
 
@@ -585,7 +609,10 @@ class App {
     }
     if (this.mode === "auto") {
       // The autopilot's landings never count for the player's scores or progress.
+      // Same seed gives the same flight, so a new attempt needs a new scenario.
+      const tryAnother: Action = [landed ? "Watch another" : "Try again", () => this.newRun(sim.config, randomSeed(), true)];
       const actions: Action[] = [
+        tryAnother,
         ["Watch again", () => this.restart()],
         ["Fly it yourself", () => this.flyYourself()],
       ];

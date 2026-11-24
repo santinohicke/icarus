@@ -1,6 +1,6 @@
 {
  "format": 1,
- "physics_version": 1,
+ "physics_version": 2,
  "name": "easy_relight",
  "config": "easy",
  "seed": "18446744073709551615",
@@ -1637,5 +1637,5 @@
   }
  ],
  "hash": "5e1876651cba2e7f",
- "replay": "SUNSUAEBAAD___________MDAAAZAAAAMpYAfzKWf38UAP5_Hpb-fzKWAH8yln9_FAD-fx6W_n8ylgB_MpZ_fxQA_n8elv5_MpYAfzKWf38UAP5_Hpb-fzKWAH8yln9_Mpb-fzKWAH8yln9_Mpb-fzKWAH8yln9_C5b-fwAA"
+ "replay": "SUNSUAECAAD___________MDAAAZAAAAMpYAfzKWf38UAP5_Hpb-fzKWAH8yln9_FAD-fx6W_n8ylgB_MpZ_fxQA_n8elv5_MpYAfzKWf38UAP5_Hpb-fzKWAH8yln9_Mpb-fzKWAH8yln9_Mpb-fzKWAH8yln9_C5b-fwAA"
 }

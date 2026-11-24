@@ -48,4 +48,4 @@ pub use sim::{Injection, Sim, TELEMETRY_FIELDS, TELEMETRY_LEN};
 /// integration, RNG usage). Replays and golden parity files record it, so a
 /// replay made with another physics version is rejected instead of silently
 /// re-simulating to a different result.
-pub const PHYSICS_VERSION: u16 = 1;
+pub const PHYSICS_VERSION: u16 = 2;

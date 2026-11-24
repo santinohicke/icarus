@@ -109,14 +109,14 @@ Development and first training happen on `easy`; the main research results use `
 
 | Level | Vehicle | What changes |
 | --- | --- | --- |
-| `training` | easy | 400–500 m, −25 to −20 m/s, almost no wind, ±30 m offset, 50 m pad half-width |
+| `training` | easy | 150–200 m, −11 to −9 m/s, no drift or tilt, almost no wind, ±30 m offset, 50 m pad half-width; forgiving touchdown limits (3 m/s down, 2 m/s sideways, 10°) |
 | `easy` | easy | As above in the table |
 | `crosswind` | easy | Mean wind up to ±10 m/s, turbulence σ 2.5 m/s, a gust every ~10 s (4–8 m/s), ±150 m offset, 30 m pad half-width |
 | `realistic` | realistic | As above in the table |
 | `storm` | realistic | Mean wind up to ±14 m/s, turbulence σ 3 m/s, a gust every ~8 s (6–12 m/s), 6-tick sensor delay |
 | `engine_out` | realistic | A fault in every episode between 4 and 10 s: a stuck gimbal (0.3–0.8°) or a thrust loss (82–90% left) |
 
-Configuration ids 0 and 1 are unchanged, so earlier replays stay valid.
+Physics version 2 changed the `training` level (lower, slower start and forgiving limits), so version-1 replay links are rejected rather than replayed differently.
 
 ### Forces and effects
 

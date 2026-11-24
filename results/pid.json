@@ -1,7 +1,7 @@
 {
  "controller": "pid",
  "seeds": 500,
- "physics_version": 1,
+ "physics_version": 2,
  "battery": {
   "easy": [
    {
@@ -20,7 +20,7 @@
     "contact_vx": 0.05578274055527992,
     "position_error": 0.32998687499653717,
     "propellant_used": 3699.804110182047,
-    "act_us": 0.5245620019263307
+    "act_us": 0.7447900740232483
    },
    {
     "controller": "pid",
@@ -38,7 +38,7 @@
     "contact_vx": 0.0566266028875032,
     "position_error": 0.4225770631179808,
     "propellant_used": 3751.502387968999,
-    "act_us": 0.534869184624268
+    "act_us": 0.8127665513467043
    },
    {
     "controller": "pid",
@@ -61,7 +61,7 @@
     "contact_vx": 0.3315781911009326,
     "position_error": 5.167007706051909,
     "propellant_used": 3844.0204058362397,
-    "act_us": 0.5143080272875645
+    "act_us": 0.6691058443035711
    },
    {
     "controller": "pid",
@@ -79,7 +79,7 @@
     "contact_vx": 0.07863823525190727,
     "position_error": 0.29878205805138147,
     "propellant_used": 3705.461323183433,
-    "act_us": 0.6104547767717478
+    "act_us": 0.8883054273148745
    },
    {
     "controller": "pid",
@@ -101,7 +101,7 @@
     "contact_vx": 0.16915353121799073,
     "position_error": 4.618971800797179,
     "propellant_used": 3707.560753662001,
-    "act_us": 0.5252300106133572
+    "act_us": 0.973279149825264
    },
    {
     "controller": "pid",
@@ -119,7 +119,7 @@
     "contact_vx": 0.04806844442969959,
     "position_error": 0.853656914140786,
     "propellant_used": 3678.79908712116,
-    "act_us": 0.5170307336542991
+    "act_us": 0.6290355340339258
    },
    {
     "controller": "pid",
@@ -143,7 +143,7 @@
     "contact_vx": 0.4067197206921328,
     "position_error": 6.5782667774758234,
     "propellant_used": 3663.33026084283,
-    "act_us": 0.5237653405001119
+    "act_us": 0.704883321122443
    }
   ],
   "realistic": [
@@ -168,7 +168,7 @@
     "contact_vx": 0.18444885742272002,
     "position_error": 0.6895583688231266,
     "propellant_used": 2940.9060815497464,
-    "act_us": 0.5003164222187333
+    "act_us": 0.7082524460678765
    },
    {
     "controller": "pid",
@@ -191,7 +191,7 @@
     "contact_vx": 0.2025619105237291,
     "position_error": 0.7818876227069661,
     "propellant_used": 2831.718462051844,
-    "act_us": 0.503047802967788
+    "act_us": 0.6771939912043071
    },
    {
     "controller": "pid",
@@ -215,7 +215,7 @@
     "contact_vx": 0.3202176306030414,
     "position_error": 1.6267011211991598,
     "propellant_used": 2929.456073387201,
-    "act_us": 0.5409511578234103
+    "act_us": 0.718531100257907
    },
    {
     "controller": "pid",
@@ -238,7 +238,7 @@
     "contact_vx": 0.18342766733804441,
     "position_error": 0.76838111458488,
     "propellant_used": 2940.4862864060583,
-    "act_us": 0.5827773787070459
+    "act_us": 0.6913796026371362
    },
    {
     "controller": "pid",
@@ -262,7 +262,7 @@
     "contact_vx": 0.4156054449191486,
     "position_error": 2.892348570686024,
     "propellant_used": 2937.309310413281,
-    "act_us": 0.5673876430813042
+    "act_us": 0.8056883103759999
    },
    {
     "controller": "pid",
@@ -284,7 +284,7 @@
     "contact_vx": 0.3394182589538457,
     "position_error": 1.007239681961002,
     "propellant_used": 2954.3653742003453,
-    "act_us": 0.5140215696501058
+    "act_us": 0.5717530242400735
    },
    {
     "controller": "pid",
@@ -308,7 +308,7 @@
     "contact_vx": 0.4075116508027433,
     "position_error": 2.591488579131516,
     "propellant_used": 2932.2356457953865,
-    "act_us": 0.588385295828036
+    "act_us": 0.6356896277625685
    }
   ]
  },
@@ -325,11 +325,11 @@
    "outcomes": {
     "landed": 500
    },
-   "contact_vy": 1.0456917031974216,
-   "contact_vx": 0.04515652191777941,
-   "position_error": 0.26870054439076513,
-   "propellant_used": 2957.263816280643,
-   "act_us": 0.7344721279915299
+   "contact_vy": 1.720539561529807,
+   "contact_vx": 0.05154170681856686,
+   "position_error": 0.4261718983654543,
+   "propellant_used": 1825.5143044289807,
+   "act_us": 0.6582457938989805
   },
   {
    "controller": "pid",
@@ -347,7 +347,7 @@
    "contact_vx": 0.05578274055527992,
    "position_error": 0.32998687499653717,
    "propellant_used": 3699.804110182047,
-   "act_us": 0.5717868390243377
+   "act_us": 1.1369306540480302
   },
   {
    "controller": "pid",
@@ -367,7 +367,7 @@
    "contact_vx": 0.24605551131738396,
    "position_error": 2.1860124176563813,
    "propellant_used": 3791.7738209294603,
-   "act_us": 0.6150012883436978
+   "act_us": 0.9495206300014891
   },
   {
    "controller": "pid",
@@ -390,7 +390,7 @@
    "contact_vx": 0.18444885742272002,
    "position_error": 0.6895583688231266,
    "propellant_used": 2940.9060815497464,
-   "act_us": 0.6602896738773331
+   "act_us": 0.7736072565860903
   },
   {
    "controller": "pid",
@@ -413,7 +413,7 @@
    "contact_vx": 0.2851880968535459,
    "position_error": 1.6979833980754857,
    "propellant_used": 2920.389674305448,
-   "act_us": 0.8829807783585247
+   "act_us": 0.6458881319219913
   },
   {
    "controller": "pid",
@@ -437,7 +437,7 @@
    "contact_vx": 0.25282765863535334,
    "position_error": 0.8456768790688107,
    "propellant_used": 2949.296983283385,
-   "act_us": 0.5706936250367777
+   "act_us": 0.6018482062624766
   }
  ]
 }
