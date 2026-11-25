@@ -93,6 +93,11 @@ export class Hud {
     root.append(primary, list, this.faults);
   }
 
+  /** The element showing `key` ("tilt", "rcs", ...), for the tutorial spotlight. */
+  element(key: string): HTMLElement | undefined {
+    return this.rows.get(key)?.row;
+  }
+
   private set(key: string, text: string, level: Level = "idle"): void {
     const r = this.rows.get(key);
     if (!r) return;

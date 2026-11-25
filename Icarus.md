@@ -248,6 +248,7 @@ A fixed battery of scenarios with known seeds, run identically for every control
 ## 4. The website
 
 - **Manual mode:** the user lands with the keyboard (throttle, gimbal, RCS), the mouse, or **touch controls** on mobile (many visitors will open the link from a phone).
+- **Tutorial (level 0):** a Training flight flown entirely by the player. A scripted push causes a lean, a sideways drift and a drop in thrust in turn; each time the simulation freezes until the player presses the key that fixes it, with the screen grayed except the relevant HUD numbers and a one-line instruction next to the rocket. Tutorial flights never count for scores.
 - **AI mode:** the policy runs in the browser through the Rust/WASM module (hand-written MLP, see §5), deciding at 20 Hz over the 60 Hz simulation.
 - **Duel mode:** human, AI and classical controllers in the same scenario with the same seed, side by side.
 - **Difficulty:** `easy` (can hover) and `realistic` (hoverslam) vehicle configurations.

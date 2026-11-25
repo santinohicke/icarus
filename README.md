@@ -21,6 +21,7 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 ## What is in Stage 2 (the web app)
 
 - Main menu: the Earth from orbit with the stage circling it, and a six-level campaign (training, easy, crosswind, realistic, storm, engine out), all open from the start (landed levels are marked and the menu suggests the next one).
+- Tutorial (level 0): a Training flight the player flies by hand. Three times a scripted push causes a problem (a lean, a drift, a drop in thrust); time freezes, the screen turns gray except the HUD numbers that matter, and white text by the rocket says which key fixes it. No autopilot flies any part of it.
 - Quiet synthesized sound effects (engine, RCS, touchdown, explosion), with a mute toggle.
 - White RCS cold-gas jets at the nose, on the side opposite to the push.
 - Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt. Hidden by default.

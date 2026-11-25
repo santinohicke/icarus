@@ -13,6 +13,8 @@ const HOLD_BUTTONS = [
 
 export class TouchControls {
   private readonly fill: HTMLDivElement;
+  private readonly track: HTMLDivElement;
+  private readonly buttons = new Map<string, HTMLButtonElement>();
   private dragging = false;
 
   constructor(
@@ -29,6 +31,7 @@ export class TouchControls {
     // A pointer-driven slider (not an <input>: a focused input would swallow
     // the keyboard controls). Drag anywhere on the track, bottom = 0.
     const track = document.createElement("div");
+    this.track = track;
     track.className = "touch-track";
     // Pointer-only: keyboard users have ↑/↓, so it stays out of the
     // accessibility tree rather than announcing a control it cannot operate.
@@ -64,6 +67,7 @@ export class TouchControls {
     pad.className = "touch-pad";
     for (const [text, code, aria] of HOLD_BUTTONS) {
       const b = this.button(text, aria);
+      this.buttons.set(code, b);
       const release = (): void => this.input().release(code);
       b.addEventListener("pointerdown", (e) => {
         e.preventDefault();
@@ -96,6 +100,12 @@ export class TouchControls {
     if (rect.height <= 0) return;
     const frac = 1 - (e.clientY - rect.top) / rect.height;
     this.input().setThrottle(Math.round(Math.min(1, Math.max(0, frac)) * Q_MAX));
+  }
+
+  /** The on-screen control for a key code, or the throttle bar for the throttle keys. */
+  target(code: string): HTMLElement | null {
+    if (code === "ArrowUp" || code === "ArrowDown") return this.track;
+    return this.buttons.get(code) ?? null;
   }
 
   /** Mirrors the current throttle level (call once per frame). */

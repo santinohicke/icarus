@@ -76,8 +76,12 @@ export class Renderer {
     window.addEventListener("resize", () => this.resize());
   }
 
+  /** Where the stage was last drawn, in CSS pixels: centre of mass and half its drawn length. */
+  rocketOnScreen: { x: number; y: number; half: number } | null = null;
+
   /** Forgets the camera and effects (new run). */
   reset(): void {
+    this.rocketOnScreen = null;
     this.cam = null;
     this.streaks = [];
     this.endTime = null;
@@ -289,6 +293,7 @@ export class Renderer {
     }
 
     const len = info.length * s;
+    this.rocketOnScreen = { x: px, y: py, half: len / 2 };
     const width = Math.max(3, info.diameter * s);
     const tail = p.cm * s; // CoM → tail distance, downward on screen
     const nose = len - tail;

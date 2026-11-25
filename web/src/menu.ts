@@ -6,8 +6,6 @@ import type { GeometryObject, Topology } from "topojson-specification";
 import { feature } from "topojson-client";
 import landTopology from "world-atlas/land-110m.json";
 
-import type { Config } from "./sim";
-
 const SVG_NS = "http://www.w3.org/2000/svg";
 const W = 680;
 const H = 383;
@@ -16,12 +14,13 @@ const EARTH = { cx: 500, cy: 780, r: 560 } as const;
 /** Visible orbit ellipse (tilted). */
 const ORBIT = { cx: 500, cy: 300, rx: 300, ry: 64, tilt: (-10 * Math.PI) / 180 } as const;
 
-export interface MenuLevel {
-  config: Config;
+export interface MenuLevel<Id extends string = string> {
+  id: Id;
   title: string;
-  best: number | null;
-  /** Landed at least once (even if the score has since been reset). */
-  landed: boolean;
+  /** Short status under the title ("Best 1,625", "Landed"), or null. */
+  status: string | null;
+  /** Finished at least once: the cursor starts on the first level that is not. */
+  done: boolean;
 }
 
 function svg<K extends keyof SVGElementTagNameMap>(
@@ -223,7 +222,7 @@ function buildScene(): { root: SVGSVGElement; rocket: SVGGElement } {
   return { root, rocket };
 }
 
-export class MainMenu {
+export class MainMenu<Id extends string = string> {
   private readonly scene: SVGSVGElement;
   private readonly rocket: SVGGElement;
   private readonly list: HTMLElement;
@@ -234,7 +233,7 @@ export class MainMenu {
 
   constructor(
     private readonly root: HTMLElement,
-    private readonly onPick: (config: Config) => void,
+    private readonly onPick: (id: Id) => void,
     private readonly onToggleSound: () => boolean,
     soundOn: boolean,
     version: string,
@@ -265,26 +264,25 @@ export class MainMenu {
     this.soundItem.setAttribute("aria-pressed", String(on));
   }
 
-  show(levels: readonly MenuLevel[]): void {
+  /** Shows the levels, numbered from 0 (the tutorial). */
+  show(levels: readonly MenuLevel<Id>[]): void {
     const items = levels.map((level, i) => {
       const b = html("button", "menu-level");
       b.type = "button";
-      const index = html("span", "menu-index", String(i + 1));
+      const index = html("span", "menu-index", String(i));
       const title = html("span", "menu-level-title", level.title);
-      const status = html("span", "menu-level-best");
-      if (level.best !== null) status.textContent = `Best ${level.best.toLocaleString("en-US")}`;
-      else if (level.landed) status.textContent = "Landed";
+      const status = html("span", "menu-level-best", level.status ?? undefined);
       b.append(index, title, status);
-      b.addEventListener("click", () => this.onPick(level.config));
+      b.addEventListener("click", () => this.onPick(level.id));
       b.addEventListener("mouseenter", () => b.focus({ preventScroll: true }));
       return b;
     });
     this.list.replaceChildren(...items);
     this.root.hidden = false;
     this.lastTime = null;
-    // Every level is open; the cursor starts on the first one not landed yet
+    // Every level is open; the cursor starts on the first one not done yet
     // (the suggested next mission), or the last one once all are done.
-    const next = levels.findIndex((level) => !level.landed);
+    const next = levels.findIndex((level) => !level.done);
     items[next === -1 ? items.length - 1 : next]?.focus({ preventScroll: true });
     if (this.frame === null) this.frame = requestAnimationFrame((t) => this.animate(t));
   }
