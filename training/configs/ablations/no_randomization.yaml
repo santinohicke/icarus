@@ -1,0 +1,6 @@
+# Ablation: no domain randomization anywhere (mass, propellant, wind,
+# actuator lags, sensor noise and delay keep their task values), including
+# the final stage's own ranges.
+base: ../ppo_base.yaml
+randomization:
+  enabled: false

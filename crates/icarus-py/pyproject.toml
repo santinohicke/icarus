@@ -11,6 +11,9 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
+# The RL environment exchanges NumPy arrays (rust-numpy needs the C API at
+# runtime, so this is a hard dependency).
+dependencies = ["numpy>=1.24"]
 dynamic = ["version"]
 
 [tool.maturin]

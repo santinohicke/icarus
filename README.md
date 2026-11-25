@@ -8,7 +8,31 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 
 **Play it: <https://icarus-ai.pages.dev/>**
 
-**Status: Stages 1–3 complete** (core, playable web app, PID baseline and evaluation battery). The reinforcement-learning agent is next.
+**Status: Stages 1–3 complete; Stage 4 in progress.** The RL environment, the vectorized Rust env, the PPO training stack, the curriculum, domain randomization, failures and the policy export are done and tested. The agent is still being trained. It goes through the curriculum up to realistic-vehicle starts from 150–400 m (40–50% landings there), but does not yet land the full `realistic` hoverslam from 1.5 km, and it forgets the easy vehicle while learning the realistic one (earlier runs reached 98% on `easy` before moving on).
+
+## What is in Stage 4 (the agent, in progress)
+
+- **The RL environment in the core** (`icarus_core::env`), shared by training and, next, the web:
+  - **Decisions:** 20 Hz, each action held for 3 physics ticks, quantized to the same 255 levels as human input, so an agent's flight is an ordinary replay.
+  - **Observation:** what a flight computer knows. It holds the delayed, noisy sensors, the propellant gauge, the actual gimbal and thrust, the engine state, the ignitions left, the sensor delay, the nominal thrust-to-weight ratio, and the actions taken within the delay window. That is 26 values.
+  - **Reward:** potential-based shaping toward the pad, with a braking profile vertically and an approach reference laterally, plus a landing bonus, a crash penalty, and costs for propellant and time. The time cost is calibrated so that hovering or postponing a crash never pays.
+  - **Tasks:** named parameter overrides on any configuration or evaluation scenario, plus per-episode domain randomization on its own random stream.
+  - **Batching:** auto-reset slots and episode seeds that never collide with evaluation seeds.
+- **A vectorized Rust environment** (`icarus.VecEnv`). It steps N environments per call on every core with the GIL released and returns NumPy arrays. It matches N single environments bit for bit, and gives identical results for any thread count.
+- **Python adapters** (`training/icarus_env`): a Gymnasium wrapper (passes `check_env`), a Stable-Baselines3 `VecEnv` adapter and the curriculum.
+- **PPO training** (`training/train.py`, versioned YAML in `training/configs/`), with:
+  - two reverse curricula (easy vehicle, then the hoverslam vehicle) of 13 stages;
+  - gradual domain randomization;
+  - failures (stuck gimbal, 20% thrust loss) in 30% of the late episodes;
+  - validation on seeds disjoint from evaluation, and TensorBoard logs.
+- **Ablation configs:** no curriculum, no randomization, no action history, no failures, a 128-unit MLP, and a recurrent policy.
+- **Export** (`training/export_policy.py`):
+  - the actor as flat little-endian `float32` weights, plus a JSON manifest with the frozen `VecNormalize` statistics;
+  - the manifest also carries SHA-256 checksums of the weights and of every field inference depends on;
+  - every export is verified against PyTorch, within `1e-5`, on the policy's own flights.
+- **Agent evaluation:** `training/evaluate.py --agent agent.json` runs the same battery and seeds as the PID.
+- **Throughput benchmark:** `training/benchmark.py`, Python stepping against the Rust batch.
+- **Golden hashes of the environment** (`parity/env_golden.json`): observations and rewards are pinned bit for bit, natively and from Python, on every CI operating system.
 
 ## What is in Stage 3 (the classical baseline)
 
@@ -103,8 +127,20 @@ while not sim.done:
 rows = icarus.evaluate("pid", "realistic", "gimbal_stuck", list(range(100)))
 ```
 
+```python
+import icarus, numpy as np
+
+env = icarus.VecEnv(64, seed=0, task={"config": "realistic", "randomization": {"sensor_delay": [0, 6]}})
+obs = env.reset()                                    # (64, 26) float32
+obs, rewards, terminated, truncated, info = env.step(np.zeros((64, 3)))
+```
+
 ```sh
+pip install numpy gymnasium stable-baselines3 torch pyyaml tensorboard
 python training/evaluate.py --controller pid --seeds 500   # writes results/pid.md and pid.json
+python training/train.py --config training/configs/ppo_base.yaml --seed 0   # hours on 4 cores; see Icarus.md §3
+python training/evaluate.py --agent training/runs/ppo_base-s0/best/agent.json --name ppo
+python training/benchmark.py --out results/throughput.md
 ```
 
 ## Tests
@@ -112,7 +148,7 @@ python training/evaluate.py --controller pid --seeds 500   # writes results/pid.
 ```sh
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace                       # physics, convergence, analytic, determinism, replays, goldens
-cd training && python -m pytest              # Python API, controllers, evaluation, golden parity
+cd training && python -m pytest              # Python API, controllers, RL env, vec env, export, goldens
 node parity/verify_wasm.mjs                  # WebAssembly matches the goldens bit for bit
 cd web && npm test                           # loop, controls, frame-rate independence, playability, scores, links, replays
 ```
@@ -131,7 +167,7 @@ crates/icarus-wasm   WebAssembly bindings
 crates/icarus-py     Python bindings (module `icarus`)
 web/                 browser front-end (Vite + TypeScript)
 parity/              golden trajectories and the WebAssembly verifier
-training/            Python tests now; RL training and evaluation in later stages
+training/            RL environment adapters, PPO training, export, evaluation, benchmark
 ```
 
 ## License

@@ -2,6 +2,9 @@
 
 from typing import Any, Final, final
 
+import numpy as np
+import numpy.typing as npt
+
 __version__: Final[str]
 PHYSICS_VERSION: Final[int]
 REPLAY_FORMAT_VERSION: Final[int]
@@ -128,3 +131,107 @@ class Recorder:
     def score(self) -> int: ...
     @property
     def tick(self) -> int: ...
+
+# --- Reinforcement-learning environment (stage 4) ---------------------------
+
+ACTION_DIM: Final[int]
+
+def episode_seed(base: int, env_index: int, episode: int) -> int:
+    """Seed of episode ``episode`` of environment ``env_index`` in a batch seeded with ``base``.
+
+    Always has the top bit set, so it never collides with evaluation seeds.
+    """
+
+def default_env_config() -> dict[str, Any]:
+    """The default environment configuration, as a dict."""
+
+def obs_fields(history_len: int = 4) -> list[str]:
+    """Names of the observation components."""
+
+def override_keys() -> list[tuple[str, int]]:
+    """Names accepted in a task's ``overrides`` with their number of values (angles in radians)."""
+
+@final
+class Env:
+    """One environment: observation, reward and termination computed in Rust.
+
+    ``task``: ``{"config", "scenario", "overrides", "randomization"}`` (all optional).
+    ``env_config``: ``{"action_repeat", "history_len", "action_history",
+    "quantize_actions", "reward"}`` (all optional).
+    """
+
+    def __new__(
+        cls, task: dict[str, Any] | None = None, env_config: dict[str, Any] | None = None
+    ) -> Env: ...
+    def reset(self, seed: int) -> npt.NDArray[np.float32]: ...
+    def step(
+        self, action: npt.ArrayLike
+    ) -> tuple[npt.NDArray[np.float32], float, bool, bool, dict[str, Any]]:
+        """One decision: ``(obs, reward, terminated, truncated, info)``.
+
+        Raises ``ValueError`` for a malformed or non-finite action and
+        ``RuntimeError`` before ``reset`` or after the episode ended.
+        """
+    def set_task(self, task: dict[str, Any]) -> None:
+        """Replaces the task from the next reset on."""
+    def observation(self) -> npt.NDArray[np.float32]: ...
+    def telemetry_dict(self) -> dict[str, float]: ...
+    def env_config(self) -> dict[str, Any]: ...
+    @property
+    def obs_dim(self) -> int: ...
+    @property
+    def action_dim(self) -> int: ...
+    @property
+    def seed(self) -> int | None: ...
+    @property
+    def episode_return(self) -> float: ...
+    @property
+    def episode_length(self) -> int: ...
+    @property
+    def potential(self) -> float: ...
+    @property
+    def done(self) -> bool: ...
+
+@final
+class VecEnv:
+    """A batch of environments stepped in Rust on every core (GIL released)."""
+
+    def __new__(
+        cls,
+        num_envs: int,
+        seed: int = 0,
+        task: dict[str, Any] | None = None,
+        env_config: dict[str, Any] | None = None,
+        autoreset: bool = True,
+        parallel: bool | None = None,
+    ) -> VecEnv: ...
+    def reset(self, seeds: list[int] | None = None) -> npt.NDArray[np.float32]: ...
+    def step(
+        self, actions: npt.ArrayLike
+    ) -> tuple[
+        npt.NDArray[np.float32],
+        npt.NDArray[np.float64],
+        npt.NDArray[np.bool_],
+        npt.NDArray[np.bool_],
+        dict[str, npt.NDArray[Any]],
+    ]:
+        """One decision per environment: ``(obs, rewards, terminated, truncated, info)``.
+
+        ``info`` holds arrays: ``terminal_obs``, ``outcome``, ``score``,
+        ``episode_return``, ``episode_length``, ``seed`` and ``idle``.
+        """
+    def set_task(self, task: dict[str, Any], indices: list[int] | None = None) -> None: ...
+    def set_base_seed(self, seed: int) -> None: ...
+    def episode_results(self) -> list[dict[str, Any]]: ...
+    def telemetry_dict(self, index: int) -> dict[str, float]: ...
+    def env_config(self) -> dict[str, Any]: ...
+    @property
+    def num_envs(self) -> int: ...
+    @property
+    def obs_dim(self) -> int: ...
+    @property
+    def action_dim(self) -> int: ...
+    @property
+    def parallel(self) -> bool: ...
+    @parallel.setter
+    def parallel(self, value: bool) -> None: ...
