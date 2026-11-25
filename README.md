@@ -25,7 +25,7 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
 - Quiet synthesized sound effects (engine, RCS, touchdown, explosion), with a mute toggle.
 - White RCS cold-gas jets at the nose, on the side opposite to the push.
 - Live telemetry charts (uPlot): altitude, vertical speed, thrust and tilt. Hidden by default.
-- Touch controls: a throttle bar, steering and RCS buttons and an engine cut-off, switched on by the first touch.
+- Touch controls on tablets: a throttle bar, steering and RCS buttons and an engine cut-off, switched on by the first touch. Phones get a short screen saying to open the site on a computer instead (the HUD would cover the rocket), and never load the physics engine (WebAssembly).
 - Local high scores per mission (localStorage, validated on load), each with a "Watch" button.
 - Shareable replay links: the run travels in the URL hash (`#replay=...`, never sent to a server) and plays back at 1×/2×/4×.
 - Deployed to Cloudflare Pages (with Cloudflare Web Analytics), only after the WebAssembly build matches the golden trajectories bit for bit.

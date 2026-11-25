@@ -222,6 +222,49 @@ function buildScene(): { root: SVGSVGElement; rocket: SVGGElement } {
   return { root, rocket };
 }
 
+/** Puts the rocket at `angle` on its orbit, nose first, dimmed behind the Earth. */
+function placeRocket(rocket: SVGGElement, angle: number): void {
+  const ex = ORBIT.rx * Math.cos(angle);
+  const ey = ORBIT.ry * Math.sin(angle);
+  const c = Math.cos(ORBIT.tilt);
+  const s = Math.sin(ORBIT.tilt);
+  const x = ORBIT.cx + ex * c - ey * s;
+  const y = ORBIT.cy + ex * s + ey * c;
+  // Heading along the orbit (derivative of the ellipse), nose first.
+  const tx = -ORBIT.rx * Math.sin(angle);
+  const ty = ORBIT.ry * Math.cos(angle);
+  const heading = (Math.atan2(tx * s + ty * c, tx * c - ty * s) * 180) / Math.PI + 90;
+  // Behind the Earth on the far side of the orbit: dimmed.
+  const behind = Math.sin(angle) < -0.2 && Math.cos(angle) > -0.3;
+  rocket.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${heading.toFixed(1)}) scale(1.4)`);
+  rocket.setAttribute("opacity", behind ? "0.25" : "1");
+}
+
+/** Where to continue: a shared replay or challenge link must be opened as is. */
+function where(): string {
+  const shared = window.location.search !== "" || window.location.hash !== "";
+  return shared ? "Open this link there." : `Open ${window.location.host} there.`;
+}
+
+/**
+ * The screen phones get instead of the game: the menu's Earth, the title and
+ * a line saying to open the site on a computer.
+ */
+export function showPhoneNotice(root: HTMLElement): void {
+  const { root: scene, rocket } = buildScene();
+  placeRocket(rocket, 2.6);
+  const panel = html("div", "menu-panel");
+  panel.append(
+    html("h1", "menu-title", "Icarus"),
+    html("p", "menu-tagline", "Just land the rocket"),
+    html("p", "menu-note", `Icarus is played with a keyboard on a computer. ${where()}`),
+  );
+  const section = html("section", "menu");
+  section.setAttribute("aria-label", "Icarus");
+  section.append(scene, html("div", "menu-shade"), panel);
+  root.replaceChildren(section);
+}
+
 export class MainMenu<Id extends string = string> {
   private readonly scene: SVGSVGElement;
   private readonly rocket: SVGGElement;
@@ -310,20 +353,7 @@ export class MainMenu<Id extends string = string> {
     const dt = this.lastTime === null ? 0 : Math.min((now - this.lastTime) / 1000, 0.1);
     this.lastTime = now;
     this.angle += dt * 0.2;
-    const ex = ORBIT.rx * Math.cos(this.angle);
-    const ey = ORBIT.ry * Math.sin(this.angle);
-    const c = Math.cos(ORBIT.tilt);
-    const s = Math.sin(ORBIT.tilt);
-    const x = ORBIT.cx + ex * c - ey * s;
-    const y = ORBIT.cy + ex * s + ey * c;
-    // Heading along the orbit (derivative of the ellipse), nose first.
-    const tx = -ORBIT.rx * Math.sin(this.angle);
-    const ty = ORBIT.ry * Math.cos(this.angle);
-    const heading = (Math.atan2(tx * s + ty * c, tx * c - ty * s) * 180) / Math.PI + 90;
-    // Behind the Earth on the far side of the orbit: dimmed.
-    const behind = Math.sin(this.angle) < -0.2 && Math.cos(this.angle) > -0.3;
-    this.rocket.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${heading.toFixed(1)}) scale(1.4)`);
-    this.rocket.setAttribute("opacity", behind ? "0.25" : "1");
+    placeRocket(this.rocket, this.angle);
     this.frame = requestAnimationFrame((t) => this.animate(t));
   }
 }

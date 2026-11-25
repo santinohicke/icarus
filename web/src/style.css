@@ -868,6 +868,16 @@ body[data-phase="menu"] #view {
   content: "\00a0";
 }
 
+/* Phones: why there is no game here. */
+.menu-note {
+  max-width: 30ch;
+  margin: clamp(28px, 6vh, 48px) 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
 .menu-footer {
   position: absolute;
   left: clamp(20px, 6vw, 88px);

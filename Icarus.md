@@ -13,7 +13,7 @@ Icarus is a reusable-rocket landing simulator in which a reinforcement learning 
 - **A 2D GNC simulator** (Guidance, Navigation & Control) of the final landing phase: from 1–2 km altitude down to touchdown on the pad.
 - **An RL agent (PPO)** trained in that simulator on a vectorized Rust environment, and evaluated with statistical rigor against strong classical baselines: PID, LQR and MPC / convex powered-descent guidance.
 - **A public website** where anyone can:
-  - land by hand with keyboard, mouse or touch (mobile),
+  - land by hand with keyboard, mouse or touch (tablets; phones are told to use a computer),
   - watch the AI and the classical controllers land in the same scenario,
   - trigger failures (stuck gimbal, reduced thrust, gusts) and see who survives,
   - follow live telemetry like in a mission control console,
@@ -247,7 +247,7 @@ A fixed battery of scenarios with known seeds, run identically for every control
 
 ## 4. The website
 
-- **Manual mode:** the user lands with the keyboard (throttle, gimbal, RCS), the mouse, or **touch controls** on mobile (many visitors will open the link from a phone).
+- **Manual mode:** the user lands with the keyboard (throttle, gimbal, RCS), the mouse, or **touch controls** on tablets. Phones get a notice to open the site on a computer instead: on a phone-sized screen the HUD covers the rocket and the controls take the rest. Visitors who open the link on a phone still see the title and where to play.
 - **Tutorial (level 0):** three key presses land a Training flight. It starts frozen, already leaning and drifting (set up off screen before the first frame). The simulation freezes three times, graying the screen except the relevant HUD numbers and showing a one-line instruction next to the rocket: E fires the RCS until upright, → uses the gimbal to stop the drift and keep the stage over the pad, ↑ near the ground raises the throttle for a soft touchdown. One tap completes each fix; other keys are ignored. Tutorial flights never count for scores.
 - **AI mode:** the policy runs in the browser through the Rust/WASM module (hand-written MLP, see §5), deciding at 20 Hz over the 60 Hz simulation.
 - **Duel mode:** human, AI and classical controllers in the same scenario with the same seed, side by side.

@@ -8,9 +8,10 @@ import "@fontsource/jetbrains-mono/800.css";
 import { Sound } from "./audio";
 import { KeyboardControls, Q_CENTER, minRunningLevel } from "./controls";
 import { type Check, checkTable, limitStats, outcomeAdvice, outcomeTitle, type Stat, statGrid, touchdownChecks } from "./debrief";
+import { isPhone } from "./device";
 import { Hud } from "./hud";
 import { FixedLoop } from "./loop";
-import { MainMenu } from "./menu";
+import { MainMenu, showPhoneNotice } from "./menu";
 import { Renderer } from "./render";
 import { ScoreBoard, browserStore } from "./scores";
 import { replayFromHash, replayUrl, scenarioUrl } from "./share";
@@ -870,6 +871,11 @@ class App {
 }
 
 async function main(): Promise<void> {
+  // Phones get a notice and never download the simulation.
+  if (isPhone(window.screen.width, window.screen.height, window.matchMedia("(hover: none) and (pointer: coarse)").matches)) {
+    showPhoneNotice(document.body);
+    return;
+  }
   try {
     await loadWasm();
   } catch (err) {
