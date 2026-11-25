@@ -133,7 +133,8 @@ def stage_tasks(cfg: Mapping[str, Any]) -> list[dict[str, Any]]:
     names = [s["name"] for s in stages]
     rand = cfg.get("randomization") or {}
     fails = cfg.get("failures") or {}
-    rand_from = _stage_index(names, rand.get("from_stage"), "randomization")
+    rand_on = rand.get("enabled", True)
+    rand_from = _stage_index(names, rand.get("from_stage") if rand_on else None, "randomization")
     fail_from = _stage_index(names, fails.get("from_stage"), "failures")
     fail_overrides = resolve_task({"overrides": fails.get("overrides") or {}}).get("overrides", {})
     tasks = []

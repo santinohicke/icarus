@@ -66,3 +66,18 @@ def test_each_ablation_changes_what_it_says() -> None:
     # Everything else is inherited unchanged.
     base = load_config(CONFIGS / "ppo_base.yaml")
     assert load_config(ab / "mlp128.yaml")["ppo"] == base["ppo"]
+
+
+def test_disabled_randomization_ignores_its_starting_stage() -> None:
+    cfg = load_config(CONFIGS / "ppo_base.yaml")
+    cfg["curriculum"] = {
+        "stages": [s for s in cfg["curriculum"]["stages"] if s["name"] == "touchdown"]
+    }
+    cfg["curriculum"]["stages"][0] = {
+        k: v for k, v in cfg["curriculum"]["stages"][0].items() if k != "promote_at"
+    }
+    cfg["randomization"] = {"enabled": False, "from_stage": "not_a_stage_here"}
+    cfg["failures"] = {"overrides": None}
+    tasks = train.stage_tasks(cfg)
+    assert tasks
+    assert "randomization" not in tasks[0]
