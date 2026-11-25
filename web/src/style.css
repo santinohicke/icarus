@@ -726,22 +726,12 @@ body[data-mode="tutorial"] .best {
   line-height: 1.7;
 }
 
-.tutorial-hint {
-  font-size: 13px;
-}
-
 /* The key picture sits in the line of text, a little larger than the type. */
 .tutorial-key {
   width: 26px;
   height: 26px;
   margin: -4px 1px -3px;
   vertical-align: middle;
-}
-
-.tutorial-hint .tutorial-key {
-  width: 22px;
-  height: 22px;
-  margin: -4px 1px -3px;
 }
 
 .tutorial-touch-key {

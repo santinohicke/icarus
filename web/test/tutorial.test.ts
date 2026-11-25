@@ -1,86 +1,67 @@
-// The tutorial flown against the real core by a simulated player: every
-// lesson freezes time once, in order, and the player can land afterwards.
-// The tutorial itself never flies the stage; this test's pilot stands in for
-// the human.
+// The tutorial against the real core: it starts frozen, already leaning and
+// drifting, and exactly three taps (E, →, ↑) land the stage.
 
 import { readFileSync } from "node:fs";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { Q_CENTER, Q_MAX, type Quantized } from "../src/controls";
-import { Simulation, type Telemetry, type VehicleInfo, loadWasm } from "../src/sim";
+import { Simulation, loadWasm } from "../src/sim";
 import { TUTORIAL_SEED, TutorialScript } from "../src/tutorial";
 
 beforeAll(async () => {
   await loadWasm(readFileSync(new URL("../src/wasm/icarus_wasm_bg.wasm", import.meta.url)));
 });
 
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+const DEG = Math.PI / 180;
 
-/** A careful human: slow descent, small leans toward the pad, upright at touchdown. */
-function pilot(t: Telemetry, info: VehicleInfo): Quantized {
-  const alt = Math.max(0, t.clearance);
-  const theta = Math.atan2(Math.sin(t.theta), Math.cos(t.theta));
-  const vyTarget = -clamp(0.6 + 0.09 * alt, 1.2, 6);
-  const f = (t.mass * (9.81 + 1.5 * (vyTarget - t.vy))) / (info.max_thrust * Math.cos(theta));
-  const k = (clamp(f, info.min_throttle, 1) - info.min_throttle) / (1 - info.min_throttle);
-  const throttle = clamp(Math.ceil(Q_CENTER + (info.throttle_cutoff + k * (1 - info.throttle_cutoff)) * Q_CENTER), 0, Q_MAX);
-  const maxLean = (alt < 4 ? 0 : 6) * (Math.PI / 180);
-  const lean = clamp(0.035 * (t.vx - clamp(-0.04 * t.x, -2, 2)), -maxLean, maxLean);
-  const u = clamp((3 * (lean - theta) - 3 * t.omega) / 0.1, -1, 1);
-  const level = clamp(Math.round(Q_CENTER + u * Q_CENTER), 0, Q_MAX);
-  return [throttle, level, level];
-}
-
-/**
- * `steady`: a beginner who leaves the throttle where it starts (falling about
- * 10 m/s) until the throttle lesson; otherwise the careful pilot throughout.
- */
-function fly(seed = TUTORIAL_SEED, steady = false) {
+function fly(seed = TUTORIAL_SEED, log = false) {
   const sim = new Simulation("training", seed);
-  const script = new TutorialScript();
-  const freezes: string[] = [];
+  const script = new TutorialScript(sim);
+  const start = { ...sim.state };
+  const presses: string[] = [];
   for (let i = 0; i < 20_000 && sim.outcome === 0; i += 1) {
     if (script.frozen) {
       const lesson = script.lesson!;
-      freezes.push(lesson.channel);
-      // Nothing moves while frozen: the same state until the key is pressed.
-      const before = sim.state.time;
-      expect(script.press("KeyNotIt")).toBe(false);
+      if (log) console.log(`${lesson.channel} t=${sim.state.time.toFixed(1)} alt=${sim.state.clearance.toFixed(0)} th=${(sim.state.theta / DEG).toFixed(1)} vx=${sim.state.vx.toFixed(2)} vy=${sim.state.vy.toFixed(2)} x=${sim.state.x.toFixed(1)}`);
+      // A wrong key does nothing; time stays frozen.
+      expect(script.press("KeyX")).toBe(false);
       expect(script.frozen).toBe(true);
-      expect(sim.state.time).toBe(before);
-      expect(script.press(lesson.codes[0]!)).toBe(true);
+      presses.push(lesson.codes[0]!);
+      script.press(lesson.codes[0]!);
     }
-    const p = pilot(sim.state, sim.info);
-    const human: Quantized = steady && freezes.length < 3 ? [sim.info.initial_throttle_level, p[1], p[2]] : p;
-    sim.step(...script.command(sim.state, sim.info, human));
+    sim.step(...script.command(sim.state, sim.info));
   }
-  const result = { outcome: sim.outcomeName, freezes, done: script.done };
+  const result = { outcome: sim.outcomeName, presses, start, end: { ...sim.state } };
+  if (log) console.log(result.outcome, result.end.time.toFixed(1), result.end.contact_vy, result.end.contact_vx, result.end.theta / DEG, result.end.x);
   sim.dispose();
   return result;
 }
 
 describe("tutorial", () => {
-  it("freezes once per lesson, in order, and the player lands", () => {
-    expect(fly()).toEqual({ outcome: "landed", freezes: ["rcs", "gimbal", "throttle"], done: true });
-  });
-
-  it("fits every lesson in when the player leaves the throttle alone", () => {
-    expect(fly(TUTORIAL_SEED, true).freezes).toEqual(["rcs", "gimbal", "throttle"]);
-  });
-
-  it("works from other Training starts too", () => {
-    for (const seed of [1n, 2n, 3n, 5n, 7n]) {
-      expect(fly(seed).freezes, `seed ${seed}`).toEqual(["rcs", "gimbal", "throttle"]);
-    }
-  });
-
-  it("only the asked-for key resumes time", () => {
+  it("starts frozen, leaning and drifting away from the pad", () => {
     const sim = new Simulation("training", TUTORIAL_SEED);
-    const script = new TutorialScript();
-    for (let i = 0; i < 600 && !script.frozen; i += 1) sim.step(...script.command(sim.state, sim.info, [sim.info.initial_throttle_level, Q_CENTER, Q_CENTER]));
+    const script = new TutorialScript(sim);
+    expect(script.frozen).toBe(true);
     expect(script.lesson?.channel).toBe("rcs");
-    expect(script.press("KeyQ")).toBe(script.lesson?.key === "Q");
+    const s = sim.state;
+    expect(Math.abs(s.theta / DEG)).toBeCloseTo(6, 0);
+    expect(Math.abs(s.omega / DEG)).toBeLessThan(0.5);
+    expect(s.vx * Math.sign(s.x)).toBeGreaterThanOrEqual(2);
+    expect(s.clearance).toBeGreaterThan(100);
     sim.dispose();
+  });
+
+  it("lands with exactly three presses: E, then →, then ↑", () => {
+    const r = fly(TUTORIAL_SEED, true);
+    expect(r.presses).toEqual(["KeyE", "ArrowRight", "ArrowUp"]);
+    expect(r.outcome).toBe("landed");
+  });
+
+  it("lands with three presses from other Training starts too", () => {
+    for (const seed of [1n, 2n, 3n, 5n, 7n]) {
+      const r = fly(seed);
+      expect(r.presses.length, `seed ${seed}`).toBe(3);
+      expect(r.outcome, `seed ${seed}`).toBe("landed");
+    }
   });
 });

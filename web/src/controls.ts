@@ -66,6 +66,11 @@ export class InputState {
     return this.held.has(code);
   }
 
+  /** Pressed since the last sample (even if already released): a fresh press, not a key held from before. */
+  wasPressed(code: string): boolean {
+    return this.tapped.has(code);
+  }
+
   press(code: string): void {
     if (!this.held.has(code)) this.pending.push(code);
     this.held.add(code);

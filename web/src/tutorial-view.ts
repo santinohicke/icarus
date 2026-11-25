@@ -1,7 +1,6 @@
 // Tutorial overlay. While time is frozen the screen turns gray and dark
 // except the HUD items the lesson is about, which stay in colour, and white
-// text floats next to the rocket: "Press [key picture] to ...". While the
-// player fixes it, one line of text stays by the rocket. textContent only.
+// text floats next to the rocket: "Press [key picture] to ...". textContent only.
 
 import type { Lesson } from "./tutorial";
 
@@ -29,9 +28,9 @@ function roundedRect(x: number, y: number, w: number, h: number, r: number): str
 }
 
 /** "Press [key] to ...": the key as a picture, or the touch control's name. */
-function instruction(verb: string, lesson: Lesson, rest: string, touch: boolean, className: string): HTMLElement {
-  const line = el("p", className);
-  line.append(`${verb} `);
+function instruction(lesson: Lesson, touch: boolean): HTMLElement {
+  const line = el("p", "tutorial-line");
+  line.append(touch ? `${lesson.touchVerb} ` : "Press ");
   if (touch) {
     line.append(el("strong", "tutorial-touch-key", lesson.touchKey));
   } else {
@@ -41,14 +40,14 @@ function instruction(verb: string, lesson: Lesson, rest: string, touch: boolean,
     img.draggable = false;
     line.append(img);
   }
-  line.append(` ${rest}`);
+  line.append(` ${lesson.action}`);
   return line;
 }
 
 export class TutorialView {
   private readonly dim = el("div", "tutorial-dim");
   private readonly text = el("div", "tutorial-text");
-  private shown: { lesson: Lesson; frozen: boolean; touch: boolean } | null = null;
+  private shown: { lesson: Lesson; touch: boolean } | null = null;
 
   constructor(root: HTMLElement) {
     this.text.setAttribute("role", "status");
@@ -63,40 +62,26 @@ export class TutorialView {
   }
 
   /**
-   * Shows `lesson`: frozen, the gray screen and the full text; otherwise only
-   * the hint line. `targets` stay in colour; `rocket` is where the stage is
-   * drawn. Call once per frame: the text follows the rocket.
+   * Shows the frozen `lesson`: the gray screen with `targets` left in colour,
+   * and the instruction beside `rocket` (where the stage is drawn). Call once
+   * per frame: the text and the holes follow the layout.
    */
-  update(
-    lesson: Lesson,
-    frozen: boolean,
-    targets: readonly HTMLElement[],
-    rocket: { x: number; y: number; half: number } | null,
-    touch: boolean,
-  ): void {
-    const s = this.shown;
-    if (s === null || s.lesson !== lesson || s.frozen !== frozen || s.touch !== touch) {
-      this.text.replaceChildren(
-        ...(frozen
-          ? [instruction(lesson.verb, lesson, lesson.action, touch, "tutorial-line")]
-          : [instruction(lesson.hintVerb, lesson, lesson.hint, touch, "tutorial-line tutorial-hint")]),
-      );
-      this.shown = { lesson, frozen, touch };
+  update(lesson: Lesson, targets: readonly HTMLElement[], rocket: { x: number; y: number; half: number } | null, touch: boolean): void {
+    if (this.shown?.lesson !== lesson || this.shown.touch !== touch) {
+      this.text.replaceChildren(instruction(lesson, touch));
+      this.shown = { lesson, touch };
     }
     this.text.hidden = false;
     this.place(rocket);
-
-    this.dim.hidden = !frozen;
-    if (frozen) {
-      const holes = targets
-        .map((t) => t.getBoundingClientRect())
-        .filter((r) => r.width > 0 && r.height > 0)
-        .map((r) => roundedRect(r.left - PAD, r.top - PAD, r.width + 2 * PAD, r.height + 2 * PAD, RADIUS))
-        .join("");
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      this.dim.style.clipPath = `path(evenodd, "M0 0H${w}V${h}H0Z${holes}")`;
-    }
+    const holes = targets
+      .map((t) => t.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height > 0)
+      .map((r) => roundedRect(r.left - PAD, r.top - PAD, r.width + 2 * PAD, r.height + 2 * PAD, RADIUS))
+      .join("");
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.dim.style.clipPath = `path(evenodd, "M0 0H${w}V${h}H0Z${holes}")`;
+    this.dim.hidden = false;
   }
 
   /** Beside the rocket (right, else left); under it when neither side has room. */

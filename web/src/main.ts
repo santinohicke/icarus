@@ -31,7 +31,7 @@ import { TUTORIAL_SEED, TutorialScript } from "./tutorial";
 import { TutorialView } from "./tutorial-view";
 
 type Phase = "menu" | "ready" | "running" | "paused" | "ended";
-/** Who flies: the player, a recorded replay, the autopilot, or the player guided by the tutorial. */
+/** Who flies: the player, a recorded replay, the autopilot, or the tutorial's three key presses. */
 type Mode = "fly" | "replay" | "auto" | "tutorial";
 /** A menu entry: a level, or the tutorial (level 0). */
 type LevelId = Config | "tutorial";
@@ -310,7 +310,7 @@ class App {
         return;
       }
       if (targetsControl(e.target, e.code)) return;
-      // The key a frozen lesson asks for resumes time (and flies, via the controls).
+      // The key a frozen lesson asks for resumes time and starts that fix.
       // Other keys pressed during the freeze are dropped, so X cannot cut the engine on resume.
       if (this.phase === "running" && this.tutorial?.press(e.code) === true) this.controls.input.clearPending();
       switch (e.code) {
@@ -396,13 +396,13 @@ class App {
   private restart(): void {
     if (this.mode === "replay") this.replayAgain();
     else if (this.mode === "auto") this.watchAutopilot();
-    else if (this.mode === "tutorial") this.startTutorial(true);
+    else if (this.mode === "tutorial") this.startTutorial();
     else this.newRun(this.lastScenario.config, this.lastScenario.seed, false, true);
   }
 
-  /** The tutorial: a Training flight with three guided lessons. */
-  private startTutorial(launch = false): void {
-    this.newRun("training", TUTORIAL_SEED, false, launch, true);
+  /** The tutorial: three key presses land a Training flight. It opens straight on the first lesson. */
+  private startTutorial(): void {
+    this.newRun("training", TUTORIAL_SEED, false, true, true);
   }
 
   /** A new scenario of the current level, straight into the flight. */
@@ -432,7 +432,7 @@ class App {
     const autopilot = auto ? new Autopilot(config) : null;
     this.sim = sim;
     this.autopilot = autopilot;
-    this.tutorial = tutorial && autopilot === null ? new TutorialScript() : null;
+    this.tutorial = tutorial && autopilot === null ? new TutorialScript(sim) : null;
     this.mode = autopilot !== null ? "auto" : this.tutorial !== null ? "tutorial" : "fly";
     this.autoInput = [sim.info.initial_throttle_level, Q_CENTER, Q_CENTER];
     this.lastScenario = { config, seed };
@@ -550,7 +550,7 @@ class App {
     } else if (this.mode === "auto") {
       actions.push(["Watch again", () => this.watchAutopilot()], ["Fly it yourself", () => this.flyYourself()]);
     } else if (this.mode === "tutorial") {
-      actions.push(["Restart tutorial", () => this.startTutorial(true)]);
+      actions.push(["Restart tutorial", () => this.startTutorial()]);
     } else {
       actions.push(["Watch again", () => this.replayAgain()]);
     }
@@ -602,25 +602,26 @@ class App {
   }
 
   /**
-   * One tutorial tick: the player's keys, except where a lesson setup pushes.
-   * Returns null while time is frozen (nothing steps).
+   * One tutorial tick: the script flies the fix the player asked for; the
+   * player's other keys do nothing. Returns null while time is frozen.
    */
   private tutorialTick(script: TutorialScript, sim: Simulation): readonly [number, number, number] | null {
     const input = this.controls.input;
     const lesson = script.lesson;
     if (script.frozen && lesson !== null) {
-      // Touch controls send no key events: a held button or a raised throttle bar answers too.
-      const held = lesson.codes.find((c) => input.isHeld(c));
-      if (held !== undefined) script.press(held);
+      // Touch controls send no key events: a fresh press of a button or a raised
+      // throttle bar answers too (a key held from before the freeze does not).
+      const pressed = lesson.codes.find((c) => input.wasPressed(c));
+      if (pressed !== undefined) script.press(pressed);
       else if (lesson.channel === "throttle" && input.throttleLevel > this.syncedThrottle) script.answer("throttle");
       if (script.frozen) return null;
       // Presses queued during the freeze do not leak into the first tick.
       input.clearPending();
     }
-    const player = input.sample();
-    const commands = script.command(sim.state, sim.info, player);
-    // When a setup cuts the thrust, ↑ then starts from the level actually flown.
-    if (commands[0] !== player[0]) input.setThrottle(commands[0]);
+    input.sample();
+    const commands = script.command(sim.state, sim.info);
+    // The throttle shown (and the touch bar) follows what is flown.
+    input.setThrottle(commands[0]);
     this.syncedThrottle = input.throttleLevel;
     return commands;
   }
@@ -646,11 +647,11 @@ class App {
       if (frozen) this.sound.update(0, false);
       else this.sound.update(s.engine_on > 0.5 ? s.thrust_fraction : 0, Math.abs(s.rcs_torque) > 1);
     }
-    this.updateTutorialView(frozen);
+    this.updateTutorialView();
     this.charts.draw();
   }
 
-  private updateTutorialView(frozen: boolean): void {
+  private updateTutorialView(): void {
     const script = this.tutorial;
     const lesson = script?.lesson ?? null;
     if (script === null || lesson === null || this.phase !== "running") {
@@ -662,7 +663,6 @@ class App {
     if (touch) targets.push(this.touch.target(lesson.codes[0] ?? "") ?? undefined);
     this.tutorialView.update(
       lesson,
-      frozen,
       targets.filter((t): t is HTMLElement => t !== undefined),
       this.renderer.rocketOnScreen,
       touch,
@@ -708,7 +708,7 @@ class App {
           lead: "You used the side thrusters, the gimbal and the throttle. Now land Training on your own.",
           actions: [
             ["Fly Training", () => this.newRun("training", randomSeed()), "Space"],
-            ["Repeat tutorial", () => this.startTutorial(true)],
+            ["Repeat tutorial", () => this.startTutorial()],
             ["Main menu", () => this.showMenu()],
           ],
         });
@@ -716,7 +716,7 @@ class App {
         this.showCard({
           ...debrief,
           actions: [
-            ["Try again", () => this.startTutorial(true), "Space"],
+            ["Try again", () => this.startTutorial(), "Space"],
             ["Main menu", () => this.showMenu()],
           ],
         });
@@ -783,17 +783,6 @@ class App {
     const sim = this.sim;
     if (sim === null) return;
     const touch = document.body.classList.contains("touch-mode");
-    if (this.mode === "tutorial") {
-      this.showCard({
-        title: "Tutorial",
-        lead: "Three short lessons on the controls. Time stops whenever you need to act and shows you what to press.",
-        actions: [
-          ["Start", () => this.run(), touch ? undefined : "Space"],
-          ["Main menu", () => this.showMenu()],
-        ],
-      });
-      return;
-    }
     const s = sim.state;
     this.showCard({
       title: MISSION[sim.config].title,
