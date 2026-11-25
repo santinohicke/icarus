@@ -18,7 +18,7 @@ The full design, roadmap and research question are in [Icarus.md](Icarus.md).
   - **Reward:** potential-based shaping toward the pad, with a braking profile vertically and an approach reference laterally, plus a landing bonus, a crash penalty, and costs for propellant and time. The time cost is calibrated so that hovering or postponing a crash never pays.
   - **Tasks:** named parameter overrides on any configuration or evaluation scenario, plus per-episode domain randomization on its own random stream.
   - **Batching:** auto-reset slots and episode seeds that never collide with evaluation seeds.
-- **A vectorized Rust environment** (`icarus.VecEnv`). It steps N environments per call on every core with the GIL released and returns NumPy arrays. It matches N single environments bit for bit, and gives identical results for any thread count.
+- **A vectorized Rust environment** (`icarus.VecEnv`). It steps N environments per call on every core with the GIL released and returns NumPy arrays: 468,000 decisions/s (1.4 M physics ticks/s) with 64 environments on 4 cores, 7× Stable-Baselines3's `DummyVecEnv` over the same environments ([results/throughput.md](results/throughput.md)). It matches N single environments bit for bit, and gives identical results for any thread count.
 - **Python adapters** (`training/icarus_env`): a Gymnasium wrapper (passes `check_env`), a Stable-Baselines3 `VecEnv` adapter and the curriculum.
 - **PPO training** (`training/train.py`, versioned YAML in `training/configs/`), with:
   - two reverse curricula (easy vehicle, then the hoverslam vehicle) of 13 stages;
