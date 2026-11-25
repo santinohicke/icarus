@@ -257,7 +257,7 @@ export class MainMenu {
     this.setSoundLabel(soundOn);
     footer.append(this.soundItem, html("span", "menu-version", version));
 
-    root.replaceChildren(scene, panel, footer);
+    root.replaceChildren(scene, html("div", "menu-shade"), panel, footer);
   }
 
   private setSoundLabel(on: boolean): void {

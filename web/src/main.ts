@@ -7,7 +7,7 @@ import "@fontsource/jetbrains-mono/800.css";
 
 import { Sound } from "./audio";
 import { KeyboardControls, Q_CENTER, minRunningLevel } from "./controls";
-import { flightStats, limitStats, outcomeAdvice, outcomeTitle, type Stat, statGrid } from "./debrief";
+import { type Check, checkTable, limitStats, outcomeAdvice, outcomeTitle, type Stat, statGrid, touchdownChecks } from "./debrief";
 import { Hud } from "./hud";
 import { FixedLoop } from "./loop";
 import { MainMenu } from "./menu";
@@ -143,6 +143,8 @@ interface CardOptions {
   hero?: { value: string; label: string } | undefined;
   lead?: string | undefined;
   stats?: readonly Stat[];
+  /** Touchdown checks (debrief): measured value against limit. */
+  checks?: readonly Check[];
   actions: readonly Action[];
   extra?: HTMLElement | null;
   /** Keyboard hint at the bottom, e.g. "Space launches". */
@@ -568,7 +570,7 @@ class App {
     const debrief = {
       title: outcomeTitle(view.outcomeName),
       tone: landed ? ("success" as const) : ("failure" as const),
-      stats: flightStats(s, view.info),
+      checks: touchdownChecks(view.outcomeName, s, view.info),
       lead: landed ? undefined : (outcomeAdvice(view.outcomeName, view.info) ?? undefined),
     };
 
@@ -682,6 +684,7 @@ class App {
       children.push(p);
     }
     if (o.stats && o.stats.length > 0) children.push(statGrid(o.stats));
+    if (o.checks && o.checks.length > 0) children.push(checkTable(o.checks));
     if (o.extra) children.push(o.extra);
     const row = document.createElement("div");
     row.className = "card-actions";

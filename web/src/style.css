@@ -414,7 +414,7 @@ kbd {
   color: var(--dim);
 }
 
-/* Measured value against limit, ruled like an instrument table. */
+/* Briefing limits, ruled like an instrument table. */
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr));
@@ -465,51 +465,72 @@ kbd {
   color: var(--muted);
 }
 
-.stat[data-state="ok"] .stat-number {
-  color: var(--go);
-}
-
-.stat[data-state="bad"] .stat-number {
-  color: var(--abort);
-}
-
-.stat-bar {
-  position: relative;
-  height: 3px;
-  margin-top: 8px;
-  background: var(--line);
-  border-radius: 2px;
-}
-
-.stat-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: 2px;
-  background: var(--ink);
-}
-
-.stat[data-state="ok"] .stat-fill {
-  background: var(--go);
-}
-
-.stat[data-state="bad"] .stat-fill {
-  background: var(--abort);
-}
-
-.stat-mark {
-  position: absolute;
-  top: -4px;
-  width: 2px;
-  height: 11px;
-  margin-left: -1px;
-  background: var(--ink);
-  border-radius: 1px;
-}
-
 .stat-note {
   margin-top: 5px;
   font-size: 11px;
   color: var(--dim);
+}
+
+/* Debrief: measured value against limit, one row per touchdown check. */
+.checks {
+  width: 100%;
+  margin: 16px 0 0;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.checks th,
+.checks td {
+  padding: 9px 0;
+  text-align: left;
+  font-weight: 400;
+}
+
+.checks thead th {
+  padding: 0 0 6px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.checks tbody tr {
+  border-top: 1px solid var(--line);
+}
+
+.checks tbody tr:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.check-label {
+  width: 34%;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.checks .check-value {
+  width: 26%;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.check-limit {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.checks .check-state {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.checks tr[data-state="ok"] .check-value,
+.checks tr[data-state="ok"] .check-state {
+  color: var(--go);
+}
+
+.checks tr[data-state="bad"] .check-value,
+.checks tr[data-state="bad"] .check-state {
+  color: var(--abort);
 }
 
 /* --- Telemetry charts ------------------------------------------------------ */
@@ -694,6 +715,14 @@ body[data-phase="menu"] #view {
   height: 100%;
 }
 
+/* Dark wash behind the title and levels: no star sits inside a letter. */
+.menu-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 52% 58% at 22% 30%, #050a16 45%, rgba(5, 10, 22, 0.85) 62%, rgba(5, 10, 22, 0) 100%);
+}
+
 .menu-panel {
   position: absolute;
   left: clamp(10px, calc(6vw - 10px), 78px);
@@ -703,6 +732,7 @@ body[data-phase="menu"] #view {
   /* Short screens (landscape phones): the panel scrolls above the footer. */
   max-height: calc(100% - 80px);
   overflow-y: auto;
+  padding-bottom: 4px;
   text-shadow: 0 1px 12px rgba(3, 6, 14, 0.85);
 }
 
@@ -751,7 +781,7 @@ body[data-phase="menu"] #view {
 
 .menu-level:focus-visible {
   outline: 1px solid var(--line-strong);
-  outline-offset: 0;
+  outline-offset: -1px;
 }
 
 .menu-index {
@@ -776,8 +806,8 @@ body[data-phase="menu"] #view {
   text-shadow: none;
 }
 
-.menu-level-best:empty {
-  display: none;
+.menu-level-best:empty::before {
+  content: "\00a0";
 }
 
 .menu-footer {
@@ -935,6 +965,16 @@ body[data-phase="menu"] #view {
 
   .stat-number {
     font-size: 18px;
+  }
+
+  .check-label {
+    width: 30%;
+    font-size: 12px;
+  }
+
+  .check-value {
+    width: 32%;
+    font-size: 15px;
   }
 }
 

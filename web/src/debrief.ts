@@ -1,6 +1,6 @@
 // Post-flight debrief and briefing content: what happened, how to fix it, and
-// the touchdown numbers laid out as measured value against limit. Pure DOM
-// building with textContent only.
+// the touchdown numbers as a small table of measured value against limit.
+// Pure DOM building with textContent only.
 
 import type { Telemetry, VehicleInfo } from "./sim";
 
@@ -10,13 +10,16 @@ export interface Stat {
   label: string;
   value: string;
   unit?: string;
-  /** Short context under the value, e.g. "limit 3.0". */
+  /** Short context under the value, e.g. "3 ignitions". */
   note?: string;
-  state?: "ok" | "bad";
-  /** Bar fill in [0, 1]; no bar when absent. */
-  fill?: number;
-  /** Position of the limit tick on the bar, in [0, 1]. */
-  mark?: number;
+}
+
+/** One touchdown check: what the stage did against what the judge allows. */
+export interface Check {
+  label: string;
+  value: string;
+  limit: string;
+  ok: boolean;
 }
 
 const TITLES: Record<string, string> = {
@@ -64,60 +67,67 @@ export function outcomeAdvice(outcome: string, info: VehicleInfo): string | null
   }
 }
 
-function speedStat(label: string, v: number, limit: number): Stat {
-  const a = Math.abs(v);
-  return {
-    label,
-    value: a.toFixed(1),
-    unit: "m/s",
-    note: `limit ${limit.toFixed(1)}`,
-    state: a < limit ? "ok" : "bad",
-    fill: Math.min(1, a / (2 * limit)),
-    mark: 0.5,
-  };
+/** Outcomes decided at touchdown, where the touchdown numbers explain the result. */
+const TOUCHDOWN = new Set([
+  "landed",
+  "crashed_tipped_over",
+  "crashed_off_pad",
+  "crashed_vertical_speed",
+  "crashed_horizontal_speed",
+  "crashed_tilt",
+  "crashed_angular_rate",
+]);
+
+/** 3 → "3", 2.5 → "2.5". */
+function num(v: number): string {
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
 /**
- * The numbers the judge looks at, at the end of a flight: the three touchdown
- * limits, then the miss distance if a leg missed the pad, else the fuel left.
+ * A value to one decimal that never contradicts its verdict: 2.97 under a
+ * limit of 3 reads "2.9", not "3.0".
  */
-export function flightStats(s: Telemetry, info: VehicleInfo): Stat[] {
-  const tilt = Math.abs(Math.atan2(Math.sin(s.theta), Math.cos(s.theta)));
-  const maxTilt = info.max_tilt;
-  const miss = Math.max(0, -s.pad_margin);
-  const fuel = info.initial_propellant > 0 ? Math.max(0, s.propellant / info.initial_propellant) : 0;
-  const last: Stat =
-    miss > 0
-      ? { label: "Off the pad", value: miss.toFixed(1), unit: "m", note: "a leg missed", state: "bad" }
-      : {
-          label: "Fuel left",
-          value: `${Math.round(fuel * 100)}`,
-          unit: "%",
-          note: `${Math.round(s.propellant).toLocaleString("en-US")} kg`,
-          fill: Math.min(1, fuel),
-        };
-  return [
-    speedStat("Descent", s.contact_vy, info.max_vertical_speed),
-    speedStat("Sideways", s.contact_vx, info.max_horizontal_speed),
-    {
-      label: "Tilt",
-      value: (tilt * RAD_TO_DEG).toFixed(1),
-      unit: "°",
-      note: `limit ${(maxTilt * RAD_TO_DEG).toFixed(0)}°`,
-      state: tilt < maxTilt ? "ok" : "bad",
-      fill: Math.min(1, tilt / (2 * maxTilt)),
-      mark: 0.5,
-    },
-    last,
-  ];
+function shown(v: number, limit: number, ok: boolean): string {
+  const s = v.toFixed(1);
+  return ok && Number(s) >= limit ? (Math.floor(v * 10) / 10).toFixed(1) : s;
 }
 
-/** Touchdown limits for the briefing. */
+/**
+ * The touchdown checks for the debrief: descent, sideways and tilt against
+ * their limits, plus the miss distance when a leg landed off the pad. Empty
+ * when the flight ended before touchdown (fuel, bounds, time).
+ */
+export function touchdownChecks(outcome: string, s: Telemetry, info: VehicleInfo): Check[] {
+  if (!TOUCHDOWN.has(outcome)) return [];
+  const vy = Math.abs(s.contact_vy);
+  const vx = Math.abs(s.contact_vx);
+  const tilt = Math.abs(Math.atan2(Math.sin(s.theta), Math.cos(s.theta))) * RAD_TO_DEG;
+  const maxTilt = info.max_tilt * RAD_TO_DEG;
+  const check = (label: string, v: number, limit: number, unit: string, limitText = num(limit)): Check => {
+    const ok = v < limit;
+    return { label, value: `${shown(v, limit, ok)}${unit}`, limit: `${limitText}${unit}`, ok };
+  };
+  const checks: Check[] = [
+    check("Descent", vy, info.max_vertical_speed, " m/s"),
+    check("Sideways", vx, info.max_horizontal_speed, " m/s"),
+    check("Tilt", tilt, maxTilt, "°", `${Math.round(maxTilt)}`),
+  ];
+  if (outcome === "crashed_angular_rate") {
+    checks.push(check("Spin", Math.abs(s.omega) * RAD_TO_DEG, info.max_angular_rate * RAD_TO_DEG, "°/s", `${Math.round(info.max_angular_rate * RAD_TO_DEG)}`));
+  }
+  const miss = Math.max(0, -s.pad_margin);
+  if (outcome === "crashed_off_pad" || miss >= 0.05) {
+    checks.push({ label: "Off the pad", value: `${Math.max(0.1, miss).toFixed(1)} m`, limit: "0 m", ok: false });
+  }
+  return checks;
+}
+
+/** Touchdown limits and engine state for the briefing. */
 export function limitStats(info: VehicleInfo, ignitions: number, engineOn: boolean): Stat[] {
   return [
-    { label: "Descent", value: `≤ ${info.max_vertical_speed}`, unit: "m/s" },
-    { label: "Sideways", value: `≤ ${info.max_horizontal_speed}`, unit: "m/s" },
-    { label: "Tilt", value: `≤ ${Math.round(info.max_tilt * RAD_TO_DEG)}`, unit: "°" },
+    { label: "Max descent", value: num(info.max_vertical_speed), unit: "m/s" },
+    { label: "Max sideways", value: num(info.max_horizontal_speed), unit: "m/s" },
+    { label: "Max tilt", value: `${Math.round(info.max_tilt * RAD_TO_DEG)}`, unit: "°" },
     { label: "Engine", value: engineOn ? "On" : "Off", note: `${ignitions} ignition${ignitions === 1 ? "" : "s"}` },
   ];
 }
@@ -135,26 +145,44 @@ export function statGrid(stats: readonly Stat[]): HTMLElement {
   grid.dataset["count"] = String(stats.length);
   for (const s of stats) {
     const cell = el("div", "stat");
-    if (s.state) cell.dataset["state"] = s.state;
     const value = el("dd", "stat-value");
     value.append(el("span", "stat-number", s.value));
     if (s.unit) value.append(el("span", "stat-unit", s.unit));
     cell.append(el("dt", "stat-label", s.label), value);
-    if (s.fill !== undefined) {
-      const bar = el("dd", "stat-bar");
-      bar.setAttribute("aria-hidden", "true");
-      const fill = el("span", "stat-fill");
-      fill.style.width = `${(Math.max(0, Math.min(1, s.fill)) * 100).toFixed(1)}%`;
-      bar.append(fill);
-      if (s.mark !== undefined) {
-        const mark = el("span", "stat-mark");
-        mark.style.left = `${(s.mark * 100).toFixed(1)}%`;
-        bar.append(mark);
-      }
-      cell.append(bar);
-    }
     if (s.note) cell.append(el("dd", "stat-note", s.note));
     grid.append(cell);
   }
   return grid;
+}
+
+/** The debrief table: one row per check, "You" against "Limit", then OK / Over. */
+export function checkTable(checks: readonly Check[]): HTMLElement {
+  const table = el("table", "checks");
+  table.setAttribute("aria-label", "Touchdown values against their limits");
+  const head = el("tr", "");
+  const corner = el("td", "");
+  const verdict = el("td", "");
+  const you = el("th", "", "You");
+  const max = el("th", "", "Limit");
+  you.scope = "col";
+  max.scope = "col";
+  head.append(corner, you, max, verdict);
+  const thead = el("thead", "");
+  thead.append(head);
+  const body = el("tbody", "");
+  for (const c of checks) {
+    const row = el("tr", "");
+    row.dataset["state"] = c.ok ? "ok" : "bad";
+    const label = el("th", "check-label", c.label);
+    label.scope = "row";
+    row.append(
+      label,
+      el("td", "check-value", c.value),
+      el("td", "check-limit", c.limit),
+      el("td", "check-state", c.ok ? "OK" : "Over"),
+    );
+    body.append(row);
+  }
+  table.append(thead, body);
+  return table;
 }
