@@ -1,0 +1,161 @@
+"""Environment throughput: Python-side stepping vs the Rust vectorized env.
+
+Measures agent decisions per second (each decision is 3 physics ticks) for:
+
+1. the Gymnasium wrapper stepped one environment at a time from Python (one
+   Rust call per decision; how a typical Python environment is used),
+2. Stable-Baselines3's ``DummyVecEnv`` over N such wrappers (the usual way to
+   vectorize a Python environment),
+3. ``icarus.VecEnv`` stepping N environments per call on one thread,
+4. ``icarus.VecEnv`` stepping N environments per call on every core,
+5. ``IcarusVecEnv``, the SB3 adapter over (4), including the ``infos``.
+
+Actions are random and fixed in advance, so the policy costs nothing; the
+numbers are the environment's own cost. Run it on an otherwise idle machine:
+
+    python training/benchmark.py --envs 64 --seconds 5
+    python training/benchmark.py --out results/throughput.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import platform
+import sys
+import time
+from collections.abc import Callable
+from pathlib import Path
+
+import icarus
+import numpy as np
+
+TASK = {"config": "realistic"}
+
+
+def _rate(step: Callable[[], int], seconds: float) -> float:
+    """Decisions per second of ``step`` (which returns decisions made)."""
+    step()  # warm-up
+    done = 0
+    start = time.perf_counter()
+    while (elapsed := time.perf_counter() - start) < seconds:
+        done += step()
+    return done / elapsed
+
+
+def bench_gym_single(seconds: float) -> float:
+    from icarus_env import IcarusEnv
+
+    env = IcarusEnv(TASK)
+    env.reset(seed=0)
+    actions = np.random.default_rng(0).uniform(-1, 1, (1024, 3)).astype(np.float32)
+    k = 0
+
+    def step() -> int:
+        nonlocal k
+        for _ in range(256):
+            _, _, terminated, truncated, _ = env.step(actions[k % 1024])
+            k += 1
+            if terminated or truncated:
+                env.reset()
+        return 256
+
+    return _rate(step, seconds)
+
+
+def bench_dummy(n: int, seconds: float) -> float:
+    from icarus_env import IcarusEnv
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    venv = DummyVecEnv([lambda: IcarusEnv(TASK) for _ in range(n)])
+    venv.seed(0)
+    venv.reset()
+    actions = np.random.default_rng(0).uniform(-1, 1, (64, n, 3)).astype(np.float32)
+    k = 0
+
+    def step() -> int:
+        nonlocal k
+        venv.step(actions[k % 64])
+        k += 1
+        return n
+
+    return _rate(step, seconds)
+
+
+def bench_core(n: int, seconds: float, parallel: bool) -> float:
+    vec = icarus.VecEnv(n, seed=0, task=TASK, parallel=parallel)
+    vec.reset()
+    actions = np.random.default_rng(0).uniform(-1, 1, (64, n, 3))
+    k = 0
+
+    def step() -> int:
+        nonlocal k
+        vec.step(actions[k % 64])
+        k += 1
+        return n
+
+    return _rate(step, seconds)
+
+
+def bench_adapter(n: int, seconds: float) -> float:
+    from icarus_env import IcarusVecEnv
+
+    venv = IcarusVecEnv(n, seed=0, task=TASK)
+    venv.reset()
+    actions = np.random.default_rng(0).uniform(-1, 1, (64, n, 3)).astype(np.float32)
+    k = 0
+
+    def step() -> int:
+        nonlocal k
+        venv.step(actions[k % 64])
+        k += 1
+        return n
+
+    return _rate(step, seconds)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--envs", type=int, default=64, help="batch size N")
+    parser.add_argument("--seconds", type=float, default=5.0, help="time per measurement")
+    parser.add_argument("--out", type=Path, help="write a Markdown report here")
+    args = parser.parse_args(argv)
+    n, s = args.envs, args.seconds
+
+    rows = [
+        ("Gymnasium wrapper, one env stepped from Python", bench_gym_single(s)),
+        (f"SB3 `DummyVecEnv` over {n} Gymnasium wrappers", bench_dummy(n, s)),
+        (f"`icarus.VecEnv`, {n} envs, one thread", bench_core(n, s, parallel=False)),
+        (f"`icarus.VecEnv`, {n} envs, every core", bench_core(n, s, parallel=True)),
+        (f"`IcarusVecEnv` (SB3 adapter), {n} envs, every core", bench_adapter(n, s)),
+    ]
+    base = rows[1][1]
+    lines = [
+        "| Environment | Decisions/s | Physics ticks/s | vs. DummyVecEnv |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for name, rate in rows:
+        lines.append(f"| {name} | {rate:,.0f} | {3 * rate:,.0f} | {rate / base:.1f}x |")
+    table = "\n".join(lines)
+    print(table)
+    if args.out:
+        cpu = platform.processor() or platform.machine()
+        report = (
+            "# Environment throughput\n\n"
+            f"Agent decisions per second on the `realistic` task (3 physics ticks per "
+            f"decision), random actions, {s:.0f} s per measurement. Machine: {cpu}, "
+            f"{os.cpu_count()} logical cores, {platform.system()} {platform.release()}, "
+            f"Python {platform.python_version()}. Generated by `training/benchmark.py`.\n\n"
+            f"{table}\n\n"
+            "The Rust batch computes physics, observation, reward, termination and "
+            "auto-reset for every environment in one call, with the GIL released; the "
+            "Python rows pay one interpreter round trip per environment per decision.\n"
+        )
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(report, encoding="utf-8")
+        print(f"wrote {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,5 @@
+# Ablation: trained without failures, evaluated on the failure scenarios
+# (gimbal_stuck, thrust_loss) of the battery.
+base: ../ppo_base.yaml
+failures:
+  overrides: null   # null replaces the mapping; {} would merge into it

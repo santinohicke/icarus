@@ -1,0 +1,27 @@
+# Ablation: no curriculum. Train on the final task from the start (with the
+# same randomization and failures the last stage gets).
+base: ../ppo_base.yaml
+curriculum:
+  replay_fraction: 0.0
+  replay_stages: null
+  stages:
+    - name: realistic_hard
+      task:
+        config: realistic
+        overrides:
+          start.tilt_deg: [-15, 15]
+          start.angular_rate: [-0.05, 0.05]
+          wind.gust_rate: 0.1
+          wind.gust_amplitude: [4, 14]
+        randomization:
+          dry_mass: [0.95, 1.05]
+          propellant: [0.9, 1.1]
+          wind: [0.0, 1.5]
+          thrust_time_constant: [0.8, 1.25]
+          gimbal_time_constant: [0.8, 1.25]
+          sensor_noise: [0.5, 1.5]
+          sensor_delay: [0, 9]
+randomization:
+  from_stage: realistic_hard
+failures:
+  from_stage: realistic_hard

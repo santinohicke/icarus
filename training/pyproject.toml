@@ -5,10 +5,19 @@ description = "Training, evaluation and parity tooling for the Icarus simulator.
 requires-python = ">=3.11"
 # The `icarus` module is built from crates/icarus-py with maturin:
 #   maturin develop --release -m crates/icarus-py/Cargo.toml
-dependencies = []
+dependencies = [
+    "numpy>=1.24",
+    "gymnasium>=1.0",
+    "stable-baselines3>=2.4",
+    "torch>=2.2",
+    "pyyaml>=6",
+    "tensorboard>=2.15",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6", "maturin>=1.9.4,<2"]
+# Only for the recurrent-policy ablation.
+recurrent = ["sb3-contrib>=2.4"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

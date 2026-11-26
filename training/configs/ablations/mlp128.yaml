@@ -1,0 +1,4 @@
+# Ablation: a wider policy (2 x 128 instead of 2 x 64).
+base: ../ppo_base.yaml
+policy:
+  net_arch: [128, 128]

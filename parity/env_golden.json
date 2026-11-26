@@ -1,0 +1,114 @@
+{
+  "format": 1,
+  "physics_version": 2,
+  "max_steps": 400,
+  "cases": [
+    {
+      "name": "easy",
+      "task": {
+        "config": "easy"
+      },
+      "env_config": null,
+      "seed": 1,
+      "steps": 248,
+      "outcome": "crashed_off_pad",
+      "hash": "d325fe10e2dfe477"
+    },
+    {
+      "name": "realistic",
+      "task": {
+        "config": "realistic"
+      },
+      "env_config": null,
+      "seed": 2,
+      "steps": 243,
+      "outcome": "crashed_off_pad",
+      "hash": "46953e1f75f333ec"
+    },
+    {
+      "name": "storm",
+      "task": {
+        "config": "storm"
+      },
+      "env_config": null,
+      "seed": 3,
+      "steps": 237,
+      "outcome": "crashed_off_pad",
+      "hash": "54f1d450bb38ef32"
+    },
+    {
+      "name": "engine_out_randomized",
+      "task": {
+        "config": "engine_out",
+        "randomization": {
+          "dry_mass": [
+            0.9,
+            1.1
+          ],
+          "propellant": [
+            0.85,
+            1.15
+          ],
+          "wind": [
+            0.0,
+            1.5
+          ],
+          "thrust_time_constant": [
+            0.8,
+            1.25
+          ],
+          "gimbal_time_constant": [
+            0.8,
+            1.25
+          ],
+          "sensor_noise": [
+            0.5,
+            1.5
+          ],
+          "sensor_delay": [
+            0,
+            9
+          ]
+        }
+      },
+      "env_config": null,
+      "seed": 4,
+      "steps": 229,
+      "outcome": "crashed_vertical_speed",
+      "hash": "2201e7643ffe310e"
+    },
+    {
+      "name": "easy_tilted_low",
+      "task": {
+        "config": "easy",
+        "scenario": "initial_tilt",
+        "overrides": {
+          "start.altitude": [
+            200.0,
+            300.0
+          ],
+          "faults.probability": 0.5
+        }
+      },
+      "env_config": null,
+      "seed": 5,
+      "steps": 105,
+      "outcome": "crashed_off_pad",
+      "hash": "fb7ed222ba03e64f"
+    },
+    {
+      "name": "training_repeat1",
+      "task": {
+        "config": "training"
+      },
+      "env_config": {
+        "action_repeat": 1,
+        "quantize_actions": false
+      },
+      "seed": 6,
+      "steps": 374,
+      "outcome": "crashed_vertical_speed",
+      "hash": "1e1323fdf2b8f3b4"
+    }
+  ]
+}

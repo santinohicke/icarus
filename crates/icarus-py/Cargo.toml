@@ -21,6 +21,9 @@ icarus-core.workspace = true
 # No `extension-module` feature: maturin >= 1.9.4 sets it up automatically,
 # which keeps `cargo clippy --workspace` able to link.
 pyo3 = { workspace = true, features = ["abi3-py311"] }
+numpy.workspace = true
+# Steps the environments of a vectorized batch on every core (GIL released).
+rayon.workspace = true
 
 [lints]
 workspace = true

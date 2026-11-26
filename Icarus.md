@@ -168,22 +168,29 @@ The environment logic (observation construction with noise, delay and action his
 - **Vectorized environment in Rust** (`icarus-py`): one call steps N environments and returns NumPy arrays (observations, rewards, terminated, truncated) without per-environment Python overhead. Parallelized across cores with `rayon`, releasing the GIL (each episode remains deterministic on its own). It implements the SB3 `VecEnv` interface, including `terminal_observation` and `TimeLimit.truncated` in `infos`.
 - A thin single-environment `gymnasium.Env` wrapper is kept for `check_env` and debugging.
 - The curriculum stays in Python: it only sets scenario parameters on reset.
-- Throughput is benchmarked and reported (steps/s: Python env vs. Rust vectorized env).
+- Throughput is benchmarked and reported (steps/s: Python env vs. Rust vectorized env). Measured (`results/throughput.md`, 64 environments, 4 cores): the Rust batch steps 468,000 decisions/s (1.4 M physics ticks/s), 7.0× SB3's `DummyVecEnv` over the same environments; the SB3 adapter, infos included, 4.2×.
+- **Implemented (stage 4):** `icarus_core::env` (observation, reward, termination, tasks with named parameter overrides, domain randomization on its own random stream, auto-reset slots and episode seeds with the top bit set, so training never touches an evaluation seed); `icarus.Env` and `icarus.VecEnv` (rayon, GIL released, zero-copy NumPy); `training/icarus_env` (Gymnasium wrapper, SB3 `VecEnv` adapter, curriculum). The vectorized env equals N single envs bit for bit, parallel equals serial for any thread count, and golden hashes of observations and rewards (`parity/env_golden.json`) are checked natively and from Python on every CI operating system.
 
-**Decision rate:** the agent acts at 20 Hz (each action held for 3 physics ticks), so an episode is a few hundred decisions, not thousands. PPO uses `γ ≈ 0.995`.
+**Decision rate:** the agent acts at 20 Hz (each action held for 3 physics ticks), so an episode is a few hundred decisions, not thousands. PPO uses `γ = 0.999`: a horizon of about 50 s, which covers a whole landing (20–60 s). The first design used `γ ≈ 0.995` (10 s): the landing bonus then arrives discounted to almost nothing (`0.995⁸⁰⁰ ≈ 0.02`), and the first training run learned to hover and postpone its crash instead of landing. Actions are quantized to the same 255 levels as human input, so an agent's flight is an ordinary replay.
 
-**Observation:** position and velocity relative to the pad, `sin θ`, `cos θ`, `ω`, propellant fraction, actual gimbal and thrust, engine on/off, ignitions left, the sensor delay `k`, and the **last `k_max` actions** (zero-padded when `k < k_max`). The width is fixed, as an MLP needs, while the delay is randomized per episode; without the action history a delayed observation is not Markov and an MLP can't compensate. Noise and delay are configurable.
+**Observation:** position and velocity relative to the pad, `sin θ`, `cos θ`, `ω`, propellant fraction, actual gimbal and thrust, engine on/off, ignitions left, the sensor delay `k`, and the **last `k_max` actions** (zero-padded when `k < k_max`). The width is fixed, as an MLP needs, while the delay is randomized per episode; without the action history a delayed observation is not Markov and an MLP can't compensate. Noise and delay are configurable. In practice: 14 values (including the nominal thrust-to-weight ratio `T_max / (m·g)` at the gauge's mass, which tells the vehicles apart: without it, learning the realistic vehicle erased a policy that landed 98% of `easy` episodes) plus 4 decisions × 3 actions = 26. Only the actions taken within the delay window (`⌈k / 3⌉` decisions) are shown. Before the first decision, the history holds the command that keeps the initial engine state, not zero, which would mean mid-throttle. The environment rejects a task whose delay the history cannot cover.
 
-**Reward:** potential-based shaping `F = γ·Φ(s') − Φ(s)` with `Φ ≤ 0` built from distance, velocity and tilt toward the target and `Φ(terminal) = 0`, using the same `γ` as PPO so the optimal policy is preserved. The crash penalty is larger than `max |Φ|` so that crashing early is never a shortcut; at truncation the bootstrap uses `Φ(s')`, not 0. Plus +100 for landing, −100 for crashing and a small penalty for propellant used.
+**Reward:** potential-based shaping `F = γ·Φ(s') − Φ(s)` with `Φ ≤ 0` built from distance, velocity and tilt toward the target, using the same `γ` as PPO; the crash penalty is larger than `max |Φ|`, and at truncation the bootstrap uses `Φ(s')`, not 0. By default a terminal state keeps its potential (see below; `zero_terminal_potential` restores the textbook `Φ(terminal) = 0`, the form under which the optimal policy is exactly preserved). Plus +100 for landing, −100 for any other terminal outcome, a propellant cost (40 per full tank in the training config, 10 by default) and a time cost. `Φ` sums five saturating terms `w·u/(1+u)` (distance to the pad, height, speed error, tilt, rate), so `|Φ| < Σw = 65`. The speed error is the horizontal speed away from an approach reference `vx_ref = −clamp(0.1·x, ±5 m/s)`, any climb, and any descent faster than a braking profile `v_ref(h) = √(v_td² + 2·a·h)`. Without the lateral reference any sideways speed was penalized, even towards the pad. A trained agent then touched down softly (median 1.2 m/s) but wherever it happened to be: 35% off the pad on `easy`. The distance term was also raised from 10 to 25 (`Σw = 65`). **Time cost:** for an agent that cannot land yet, comparing "crash now" with "one more decision, then crash", the difference is `(1 − γ)·C − c` (crash penalty `C`, time cost `c` per decision), plus at most `(1 − γ)·max|Φ|` from the shaping. Below `(1 − γ)·C`, postponing pays: training runs learned to hover or climb until the propellant ran out. Above it, crashing early pays: a run learned to cut the engine at once. At `c = (1 − γ)·C` (2 per second) the timing of a crash is neutral, up to that small shaping term. Only the terminal state's potential (contact speed, tilt, distance) then ranks failures, which leads towards softer, upright touchdowns on the pad. **Terminal potential:** the textbook `Φ(terminal) = 0` refunds `|Φ(s)|` at the terminal decision, so crashing far from the pad pays more at that step (−56 against −98). A run with it learned to climb at full throttle to 2.8 km. The terminal state therefore keeps its potential (shaping sum `γ^T·Φ(s_T) − Φ(s_0)`), which only ranks failures; `zero_terminal_potential` restores the textbook form for comparison. Like the fuel cost, it is part of the objective (land soon), not of the shaping.
 
 ### Training
 
-- **Algorithm:** PPO (Stable-Baselines3), small MLP (2 layers of 64 units, `tanh`, SB3's default; 128 as an ablation).
+- **Algorithm:** PPO (Stable-Baselines3), small MLP (2 layers of 64 units, `tanh`, SB3's default; 128 as an ablation). Hyperparameters: 64 environments × 256 steps per update, batch 4096, 10 epochs, learning rate 3·10⁻⁴ decaying linearly to 5·10⁻⁵, GAE λ = 0.98, clip 0.2, target KL 0.05, `VecNormalize` on observations and rewards. Training runs at about 7,000–9,000 decisions per second on 4 CPU cores, where PyTorch, not the environment, is the bottleneck. `train.py --init-from CKPT --start-stage NAME` continues a checkpoint from a later stage.
 - **Observation normalization:** `VecNormalize` statistics are frozen at the end of training and exported **together with the weights**, with `epsilon` and `clip_obs`. Inference applies `clip((x − mean) / sqrt(var + eps), ±clip_obs)`, uses the deterministic action (the mean) and clips it to [-1, 1].
-- **Curriculum:** start on `easy`, close and nearly at rest; then higher, faster, more tilted and with more wind; then `realistic`.
-- **Domain randomization:** mass, propellant, wind, sensor delay and engine τ change every episode.
+- **Curriculum:** start on `easy`, close and nearly at rest; then higher, faster, more tilted and with more wind; then `realistic`. **Implemented** as two reverse curricula, 13 stages in `training/configs/ppo_base.yaml`:
+  - **Easy vehicle:** the legs a few meters above the pad (a noisy policy lands about half the time there, so the agent learns early that landing pays), hops from 22–45 m and 45–90 m, the training level, a low easy start, then `easy`.
+  - **Realistic vehicle:** the hoverslam engine cannot hover, so the throttle must sit near the cut-off instead of near hover. It starts from a few meters with the engine already running and relights to spare, then hops from 24–40 m and 40–80 m, an ignition from 150–400 m, a low realistic start, `realistic`, and realistic with tilt and gusts.
+  - Starts that low are possible because the start-altitude check uses the real contact geometry at the extremes of start tilt and mass. Three overrides were added for these stages: `start.engine_on`, `start.ignitions` and `start.initial_throttle`.
+  - Promotion happens when the success rate over a window of episodes reaches a threshold. 15% of the environments keep replaying earlier stages, and an episode counts only for the stage it actually ran on.
+  - Earlier designs, in order: starts at 55 m or higher, where the agent hovered, climbed or cut the engine depending on the time cost and never saw a landing in millions of steps; going straight from `easy` to a 700 m realistic start, with no landing in 6 M steps; and `crosswind` as a gate, which the hover-capable agent did not pass in 6 M steps. `crosswind` is still evaluated as a campaign level.
+  - **Exploration:** the untrained policy's mean action is throttle −0.4, a gentle descent, set through its output bias. With mean throttle 0 the training vehicle climbs and never touches down. The policy's state-independent std is kept at or above 0.15 by a callback, with a small entropy bonus (0.002). Without the floor it fell to 0.015, and a run spent 80 M steps unable to find the realistic vehicle's throttle regime. The deterministic action, which is exported, is unaffected.
+- **Domain randomization:** mass, propellant, wind, sensor delay and engine τ change every episode. Gimbal lag and sensor noise change too. The factors are drawn on their own random stream, always with the same number of draws, so a seed's initial conditions, wind, noise and faults are the same with or without randomization. It is introduced gradually: mild ranges (sensor delay 0–6 ticks) from the first realistic stage with a single ignition, and the full ranges (delay 0–9 ticks, wind ×0–1.5) on the final stage. Turning on a 0–9 tick delay at once broke a policy that landed 62% of `easy` episodes: it fell to 3%, mostly out of propellant from delay-induced oscillations.
 - **Failures:** in a share of the episodes, the gimbal sticks at a small angle or max thrust drops 20% mid-trajectory.
-- **Reproducibility:** fixed seeds, versioned YAML config, metric logging in TensorBoard.
+- **Reproducibility:** fixed seeds, versioned YAML config, metric logging in TensorBoard. Validation for checkpoint selection uses seeds ≥ 2,000,000, which never overlap evaluation (from 0) or controller tuning (from 1,000,000).
 
 ### Experiments and ablations
 
@@ -346,7 +353,8 @@ icarus/
 │   │   │   │   └── scenario.rs   # initial conditions, outcomes, score
 │   │   │   ├── sim.rs            # the simulation loop: one tick = one step
 │   │   │   ├── replay.rs         # per-tick inputs, events, RLE + base64url
-│   │   │   ├── env.rs            # observation, reward, termination (stage 4)
+│   │   │   ├── env/              # mod.rs: observation, reward, termination, auto-reset;
+│   │   │   │                     # task.rs: overrides, domain randomization (stage 4)
 │   │   │   ├── control/          # pid.rs (stage 3); lqr.rs, guidance.rs, mpc.rs (stage 6)
 │   │   │   ├── eval.rs           # evaluation scenarios and episode summaries
 │   │   │   └── policy.rs         # MLP forward pass + normalization (stage 5)
@@ -357,7 +365,7 @@ icarus/
 │   ├── icarus-py/                # pyo3 binding, built with maturin
 │   │   ├── Cargo.toml
 │   │   ├── pyproject.toml
-│   │   └── src/lib.rs            # vec_env.rs arrives in stage 4
+│   │   └── src/                  # lib.rs; env.rs: Env + rayon VecEnv over NumPy (stage 4)
 │   └── icarus-wasm/              # wasm-bindgen binding
 │       ├── Cargo.toml
 │       └── src/lib.rs
@@ -366,7 +374,10 @@ icarus/
 │   ├── icarus_env/
 │   │   ├── env.py                # single-env gymnasium wrapper (debug, check_env)
 │   │   ├── vec_env.py            # SB3 VecEnv adapter over the Rust vectorized env
-│   │   └── curriculum.py         # sets scenario parameters on reset
+│   │   ├── curriculum.py         # sets scenario parameters on reset
+│   │   ├── tasks.py              # YAML-friendly task specs
+│   │   ├── config.py             # YAML configs with `base:` inheritance
+│   │   └── policy.py             # exported-policy loading + NumPy reference inference
 │   ├── tools/
 │   │   └── design_lqr.py         # computes LQR gains with scipy
 │   ├── configs/
@@ -377,11 +388,15 @@ icarus/
 │   ├── evaluate.py               # scenario battery for every controller
 │   ├── analyze.py                # rliable: IQM, confidence intervals, plots
 │   ├── export_policy.py          # f32 weights + JSON manifest
+│   ├── benchmark.py              # throughput: Python stepping vs the Rust batch
 │   └── tests/
 │       ├── test_sim_api.py       # Python binding behaves like the Rust core
 │       ├── test_env.py           # complies with the Gymnasium API
 │       ├── test_vec_env.py       # vectorized env == N single envs
-│       ├── test_policy_parity.py # Rust inference == PyTorch (within float tolerance)
+│       ├── test_env_golden.py    # observation/reward hashes (parity/env_golden.json)
+│       ├── test_export.py        # export round trip, NumPy == PyTorch, tamper checks
+│       ├── test_curriculum.py, test_train_config.py
+│       ├── test_policy_parity.py # Rust inference == PyTorch (stage 5)
 │       └── test_parity.py        # compares against golden trajectories
 ├── web/
 │   ├── package.json
@@ -432,7 +447,7 @@ icarus/
 | 1. Core + first playable | **Week 1, vertical slice:** core dynamics (RK4, gravity, gimballed thrust, mass flow) → WASM binding → Canvas page you can land with the keyboard at 60 Hz. If landing by hand isn't fun or the physics feels artificial, fix it now: tuning the RL reward on top of bad physics is a nightmare. **Then:** the complete physics model (aerodynamics, RCS, wind, faults, sensors, RNG streams, touchdown detection, outcomes and score, both vehicle configs), replay format, Python binding, bit-exact parity test (native, Python, WASM), CI | ✅ Done |
 | 2. Playable web | Telemetry (uPlot), touch controls, difficulty selector, failure buttons, local high scores, replay links in the URL hash, Cloudflare Pages deploy, Cloudflare Web Analytics | ✅ Done |
 | 3. PID baseline | Cascaded PID in Rust (with the ignition trigger for `realistic`), evaluation battery; validates the environment on `easy` first | ✅ Done |
-| 4. Agent | `env` module in the core, Rust vectorized env, PPO, curriculum, domain randomization, failures, normalization export | 2–3 weeks |
+| 4. Agent | `env` module in the core, Rust vectorized env, PPO, curriculum, domain randomization, failures, normalization export | In progress: everything but a trained agent that lands `realistic` |
 | 5. AI on the web | Hand-written MLP inference in Rust/WASM, AI mode and duel mode | 1 week |
 | 6. Strong baselines | LQR (`easy`), convex guidance and MPC with `clarabel` — only once the agent lands. Time-boxed; required before stages 7–8 (fallback: convex guidance + tracking) | 1–2 weeks |
 | 7. Experiments | Multi-seed runs, ablations, `rliable` analysis | 1 week |

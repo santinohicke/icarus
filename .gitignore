@@ -10,6 +10,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Training runs (checkpoints, TensorBoard logs): large and reproducible
+training/runs/
+
 # Web
 node_modules/
 web/dist/

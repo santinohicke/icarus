@@ -20,6 +20,10 @@ pub enum Stream {
     Sensors,
     /// Random fault schedule.
     Faults,
+    /// Per-episode domain randomization of the parameters (RL training). Its
+    /// draws happen before the episode is built and never touch the other
+    /// streams, so adding it changed no existing trajectory.
+    Randomization,
 }
 
 impl Stream {
@@ -30,6 +34,7 @@ impl Stream {
             Stream::Wind => 2,
             Stream::Sensors => 3,
             Stream::Faults => 4,
+            Stream::Randomization => 5,
         }
     }
 }

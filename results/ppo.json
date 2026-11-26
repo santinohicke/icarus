@@ -1,0 +1,448 @@
+{
+ "controller": "ppo",
+ "seeds": 500,
+ "physics_version": 2,
+ "battery": {
+  "easy": [
+   {
+    "controller": "ppo",
+    "config": "easy",
+    "scenario": "nominal",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 307,
+     "crashed_vertical_speed": 193
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 2.1000248867745834
+   },
+   {
+    "controller": "ppo",
+    "config": "easy",
+    "scenario": "initial_tilt",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 251,
+     "crashed_vertical_speed": 222,
+     "out_of_propellant": 27
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 3.446140201285604
+   },
+   {
+    "controller": "ppo",
+    "config": "easy",
+    "scenario": "strong_gusts",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 306,
+     "crashed_vertical_speed": 193,
+     "out_of_propellant": 1
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 3.381850962587171
+   },
+   {
+    "controller": "ppo",
+    "config": "easy",
+    "scenario": "delayed_sensors",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 348,
+     "crashed_vertical_speed": 152
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 2.0078822532897056
+   },
+   {
+    "controller": "ppo",
+    "config": "easy",
+    "scenario": "gimbal_stuck",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 311,
+     "crashed_vertical_speed": 189
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 2.0581049079736804
+   },
+   {
+    "controller": "ppo",
+    "config": "easy",
+    "scenario": "thrust_loss",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 317,
+     "crashed_vertical_speed": 183
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 1.9830503151556924
+   },
+   {
+    "controller": "ppo",
+    "config": "easy",
+    "scenario": "out_of_distribution",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 324,
+     "crashed_vertical_speed": 176
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 2.0014121717590116
+   }
+  ],
+  "realistic": [
+   {
+    "controller": "ppo",
+    "config": "realistic",
+    "scenario": "nominal",
+    "episodes": 500,
+    "landed": 16,
+    "success_rate": 0.032,
+    "ci_low": 0.019791513626571118,
+    "ci_high": 0.051344869045441784,
+    "outcomes": {
+     "crashed_vertical_speed": 350,
+     "crashed_off_pad": 128,
+     "landed": 16,
+     "crashed_horizontal_speed": 5,
+     "crashed_angular_rate": 1
+    },
+    "contact_vy": 1.2347398384425479,
+    "contact_vx": 0.222538876491467,
+    "position_error": 6.423929595932395,
+    "propellant_used": 2255.592764274488,
+    "act_us": 2.1978432771768412
+   },
+   {
+    "controller": "ppo",
+    "config": "realistic",
+    "scenario": "initial_tilt",
+    "episodes": 500,
+    "landed": 11,
+    "success_rate": 0.022,
+    "ci_low": 0.012328008269927582,
+    "ci_high": 0.03896086121131637,
+    "outcomes": {
+     "crashed_vertical_speed": 294,
+     "crashed_off_pad": 185,
+     "landed": 11,
+     "crashed_horizontal_speed": 6,
+     "crashed_angular_rate": 2,
+     "crashed_tilt": 2
+    },
+    "contact_vy": 1.4614542283072773,
+    "contact_vx": 0.43122555688710323,
+    "position_error": 8.569048010462303,
+    "propellant_used": 2112.4375216501594,
+    "act_us": 2.1465547083213665
+   },
+   {
+    "controller": "ppo",
+    "config": "realistic",
+    "scenario": "strong_gusts",
+    "episodes": 500,
+    "landed": 12,
+    "success_rate": 0.024,
+    "ci_low": 0.013781314655496986,
+    "ci_high": 0.041477057463900756,
+    "outcomes": {
+     "crashed_vertical_speed": 306,
+     "crashed_off_pad": 166,
+     "landed": 12,
+     "crashed_tipped_over": 9,
+     "crashed_horizontal_speed": 7
+    },
+    "contact_vy": 1.3522643764529467,
+    "contact_vx": 0.39625430223616687,
+    "position_error": 7.0651044814071255,
+    "propellant_used": 2229.142380765262,
+    "act_us": 2.3019605722622374
+   },
+   {
+    "controller": "ppo",
+    "config": "realistic",
+    "scenario": "delayed_sensors",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 394,
+     "crashed_vertical_speed": 106
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 1.9590479181035656
+   },
+   {
+    "controller": "ppo",
+    "config": "realistic",
+    "scenario": "gimbal_stuck",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 372,
+     "crashed_vertical_speed": 97,
+     "crashed_tipped_over": 31
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 2.58814974160823
+   },
+   {
+    "controller": "ppo",
+    "config": "realistic",
+    "scenario": "thrust_loss",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_vertical_speed": 285,
+     "crashed_off_pad": 215
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 1.967494244479902
+   },
+   {
+    "controller": "ppo",
+    "config": "realistic",
+    "scenario": "out_of_distribution",
+    "episodes": 500,
+    "landed": 0,
+    "success_rate": 0.0,
+    "ci_low": 4.336808689942018e-19,
+    "ci_high": 0.007624340461552241,
+    "outcomes": {
+     "crashed_off_pad": 402,
+     "crashed_vertical_speed": 98
+    },
+    "contact_vy": null,
+    "contact_vx": null,
+    "position_error": null,
+    "propellant_used": null,
+    "act_us": 2.016862171452768
+   }
+  ]
+ },
+ "campaign": [
+  {
+   "controller": "ppo",
+   "config": "training",
+   "scenario": "nominal",
+   "episodes": 500,
+   "landed": 0,
+   "success_rate": 0.0,
+   "ci_low": 4.336808689942018e-19,
+   "ci_high": 0.007624340461552241,
+   "outcomes": {
+    "out_of_propellant": 500
+   },
+   "contact_vy": null,
+   "contact_vx": null,
+   "position_error": null,
+   "propellant_used": null,
+   "act_us": 2.002400244251284
+  },
+  {
+   "controller": "ppo",
+   "config": "easy",
+   "scenario": "nominal",
+   "episodes": 500,
+   "landed": 0,
+   "success_rate": 0.0,
+   "ci_low": 4.336808689942018e-19,
+   "ci_high": 0.007624340461552241,
+   "outcomes": {
+    "crashed_off_pad": 307,
+    "crashed_vertical_speed": 193
+   },
+   "contact_vy": null,
+   "contact_vx": null,
+   "position_error": null,
+   "propellant_used": null,
+   "act_us": 2.052665898026546
+  },
+  {
+   "controller": "ppo",
+   "config": "crosswind",
+   "scenario": "nominal",
+   "episodes": 500,
+   "landed": 0,
+   "success_rate": 0.0,
+   "ci_low": 4.336808689942018e-19,
+   "ci_high": 0.007624340461552241,
+   "outcomes": {
+    "crashed_off_pad": 417,
+    "crashed_vertical_speed": 81,
+    "out_of_propellant": 2
+   },
+   "contact_vy": null,
+   "contact_vx": null,
+   "position_error": null,
+   "propellant_used": null,
+   "act_us": 2.972149831934898
+  },
+  {
+   "controller": "ppo",
+   "config": "realistic",
+   "scenario": "nominal",
+   "episodes": 500,
+   "landed": 16,
+   "success_rate": 0.032,
+   "ci_low": 0.019791513626571118,
+   "ci_high": 0.051344869045441784,
+   "outcomes": {
+    "crashed_vertical_speed": 350,
+    "crashed_off_pad": 128,
+    "landed": 16,
+    "crashed_horizontal_speed": 5,
+    "crashed_angular_rate": 1
+   },
+   "contact_vy": 1.2347398384425479,
+   "contact_vx": 0.222538876491467,
+   "position_error": 6.423929595932395,
+   "propellant_used": 2255.592764274488,
+   "act_us": 2.320561018173807
+  },
+  {
+   "controller": "ppo",
+   "config": "storm",
+   "scenario": "nominal",
+   "episodes": 500,
+   "landed": 0,
+   "success_rate": 0.0,
+   "ci_low": 4.336808689942018e-19,
+   "ci_high": 0.007624340461552241,
+   "outcomes": {
+    "crashed_off_pad": 393,
+    "crashed_vertical_speed": 107
+   },
+   "contact_vy": null,
+   "contact_vx": null,
+   "position_error": null,
+   "propellant_used": null,
+   "act_us": 2.2492813919864334
+  },
+  {
+   "controller": "ppo",
+   "config": "engine_out",
+   "scenario": "nominal",
+   "episodes": 500,
+   "landed": 0,
+   "success_rate": 0.0,
+   "ci_low": 4.336808689942018e-19,
+   "ci_high": 0.007624340461552241,
+   "outcomes": {
+    "crashed_off_pad": 261,
+    "crashed_vertical_speed": 232,
+    "crashed_tipped_over": 7
+   },
+   "contact_vy": null,
+   "contact_vx": null,
+   "position_error": null,
+   "propellant_used": null,
+   "act_us": 2.390916054657836
+  }
+ ],
+ "agent": {
+  "weights_sha256": "e650afd0eab21a6f8419eaa98edc32332be2f86f2ee97301e19d36c9d9e4cc72",
+  "training": {
+   "config": "ppo_base",
+   "seed": 0,
+   "timesteps": 28000000,
+   "git_commit": "e82ea1abec2a113a77241eb8b1ebc07c860dd5b0",
+   "exported": "2026-11-26T00:35:01+00:00"
+  },
+  "env_config": {
+   "action_repeat": 3,
+   "history_len": 4,
+   "action_history": true,
+   "quantize_actions": true,
+   "reward": {
+    "gamma": 0.999,
+    "landing_bonus": 100.0,
+    "crash_penalty": 100.0,
+    "fuel_weight": 40.0,
+    "time_weight": 2.0000000000000018,
+    "position_weight": 25.0,
+    "position_scale": 50.0,
+    "altitude_weight": 10.0,
+    "altitude_scale": 500.0,
+    "velocity_weight": 20.0,
+    "velocity_scale": 10.0,
+    "lateral_gain": 0.1,
+    "lateral_speed_max": 5.0,
+    "tilt_weight": 5.0,
+    "tilt_scale": 0.17453292519943295,
+    "rate_weight": 5.0,
+    "rate_scale": 0.2,
+    "touchdown_speed_fraction": 0.5,
+    "decel_fraction": 0.5,
+    "zero_terminal_potential": false
+   }
+  }
+ }
+}

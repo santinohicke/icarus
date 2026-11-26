@@ -1,0 +1,9 @@
+# Ablation: recurrent policy (sb3-contrib RecurrentPPO, LSTM) instead of an
+# MLP with action history. Needs `pip install sb3-contrib`. Not exportable to
+# the web (the exporter handles MLPs only).
+base: ../ppo_base.yaml
+algo: recurrent_ppo
+env:
+  action_history: false
+policy:
+  lstm_hidden_size: 64

@@ -1,0 +1,5 @@
+# Ablation: no action history in the observation. Under sensor delay the
+# observation is then not Markov; evaluate on the delayed-sensor scenario.
+base: ../ppo_base.yaml
+env:
+  action_history: false

@@ -1,0 +1,281 @@
+# PPO on the Rust vectorized environment: the main configuration.
+#
+# Ablations (configs/ablations/*.yaml) start from this file with
+# `base: ../ppo_base.yaml` and change one thing. Every value here is recorded
+# in the run directory (config.json) and in the exported manifest.
+
+algo: ppo            # ppo | recurrent_ppo (sb3-contrib, ablation only)
+seed: 0
+total_timesteps: 120_000_000  # agent decisions (20 Hz), summed over all envs (~4.5 h on 4 cores)
+num_envs: 64
+device: cpu
+torch_threads: 4
+
+# The core's environment configuration (icarus.default_env_config()).
+# reward.gamma is always set to ppo.gamma by train.py: the shaping is
+# policy-invariant only with the learner's discount.
+env:
+  action_repeat: 3       # 20 Hz decisions over the 60 Hz physics
+  history_len: 4         # covers the longest sensor delay (12 ticks)
+  action_history: true
+  quantize_actions: true # same 255 levels as human input: replayable flights
+  reward:
+    # Propellant matters (a full tank costs 40): with the core default of 10
+    # the agent descended slowly and ran out of propellant in 11% of `easy`
+    # episodes even without randomization.
+    fuel_weight: 40.0
+
+ppo:
+  n_steps: 256           # per env: 64 x 256 = 16,384 decisions per update
+  batch_size: 4096
+  n_epochs: 10
+  learning_rate: 3.0e-4
+  learning_rate_final: 5.0e-5   # linear decay to this value
+  gamma: 0.999           # horizon ~50 s at 20 Hz: covers a whole landing (20-60 s)
+  gae_lambda: 0.98       # spreads the terminal reward further back over ~50 decisions
+  clip_range: 0.2
+  # A small entropy bonus: without it the policy's std fell to 0.07 by the
+  # `easy` stage and new stages could no longer be learned.
+  ent_coef: 0.002
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: 0.05
+
+policy:
+  net_arch: [64, 64]     # SB3 default size; separate actor and critic
+  activation: tanh
+  log_std_init: -1.0     # std 0.37: fewer accidental engine cut-offs early on
+  ortho_init: true
+  # Mean action of the untrained policy (the output bias; the weights start
+  # near zero). Throttle 0 makes the training vehicle climb, so an untrained
+  # policy never touches down; at -0.4 it descends gently, and a noisy policy
+  # lands about half the time from the first stage's start.
+  initial_action: [-0.4, 0.0, 0.0]
+  # Exploration floor: the std otherwise collapsed (0.015) and the realistic
+  # vehicle's stages could never be discovered (see StdFloorCallback).
+  min_std: 0.15
+
+# VecNormalize. The observation statistics are frozen at the end of training
+# and exported with the weights.
+normalize:
+  norm_obs: true
+  norm_reward: true
+  clip_obs: 10.0
+  clip_reward: 10.0
+  epsilon: 1.0e-8
+
+# Domain randomization (per episode), from the named stage on.
+#
+# Introduced gradually: these mild ranges from `realistic_low`, the full ranges on
+# the final stage (its own `randomization`, below). Turning on a 0-9 tick
+# sensor delay at once, after stages without any delay, broke a policy that
+# landed 62% of `easy` episodes (3% with randomization, mostly out of
+# propellant from delay-induced oscillations).
+randomization:
+  from_stage: realistic_low
+  ranges:
+    dry_mass: [0.97, 1.03]
+    propellant: [0.95, 1.05]
+    wind: [0.5, 1.3]
+    thrust_time_constant: [0.85, 1.2]
+    gimbal_time_constant: [0.85, 1.2]
+    sensor_noise: [0.7, 1.3]
+    sensor_delay: [0, 6]
+
+# Failures in a share of the episodes, from the named stage on: the gimbal
+# sticks at a small angle or the engine loses 20% of its thrust.
+failures:
+  from_stage: realistic
+  overrides:
+    faults.probability: 0.3
+    faults.gimbal_stuck_share: 0.5
+    faults.trigger_time: [2.0, 15.0]
+    faults.stuck_angle_deg: [0.3, 1.0]
+    faults.thrust_factor: [0.8, 0.8]
+
+# A reverse curriculum: from a few meters above the pad (where even a random
+# policy lands half the time, so the agent learns early that landing pays),
+# gradually higher, faster, further, more tilted and windier, then the
+# realistic vehicle. A share of the environments keeps replaying earlier
+# stages. The first two stages use touchdown limits looser than any level.
+curriculum:
+  replay_fraction: 0.15
+  # Replay only the stages worth rehearsing: spread evenly over all earlier
+  # stages, `easy` got about 1.7% of the environments and was forgotten.
+  replay_stages: [easy, realistic_hop, realistic_ignite, realistic_mid, realistic_low, realistic]
+  stages:
+    - name: touchdown
+      task:
+        config: training
+        overrides:
+          start.altitude: [16, 22]        # center of mass: the legs 1-8 m up
+          start.vertical_speed: [-1.5, -0.5]
+          start.horizontal_offset: [-5, 5]
+          landing.pad_half_width: 60
+          landing.max_vertical_speed: 5.0
+          landing.max_horizontal_speed: 3.0
+          landing.max_tilt_deg: 15
+          landing.max_angular_rate: 0.3
+      promote_at: 0.8
+      window: 500
+    - name: hop_low
+      task:
+        config: training
+        overrides:
+          start.altitude: [22, 45]
+          start.vertical_speed: [-3, -1]
+          start.horizontal_offset: [-10, 10]
+          landing.pad_half_width: 60
+          landing.max_vertical_speed: 4.0
+          landing.max_horizontal_speed: 2.5
+          landing.max_tilt_deg: 12
+          landing.max_angular_rate: 0.2
+      promote_at: 0.8
+      window: 500
+    - name: hop
+      task:
+        config: training
+        overrides:
+          start.altitude: [45, 90]
+          start.vertical_speed: [-5, -2]
+          start.horizontal_offset: [-20, 20]
+      promote_at: 0.8
+      window: 500
+    - name: training
+      task: {config: training}
+      promote_at: 0.8
+      window: 500
+    - name: easy_low
+      task:
+        config: easy
+        overrides:
+          start.altitude: [300, 500]
+          start.vertical_speed: [-25, -15]
+          start.horizontal_offset: [-60, 60]
+          start.horizontal_speed: [-3, 3]
+      promote_at: 0.8
+      window: 500
+    - name: easy
+      task: {config: easy}
+      promote_at: 0.8
+      window: 1000
+    # The realistic engine is too strong to hover: a second reverse
+    # curriculum teaches the hoverslam, from a few meters with the engine
+    # already running and relights to spare, to a single ignition from high
+    # up. Starting directly at 700 m, no landing was found in 6 M steps.
+    - name: realistic_touchdown
+      task:
+        config: realistic
+        overrides:
+          start.altitude: [16, 24]
+          start.vertical_speed: [-2, -0.5]
+          start.horizontal_offset: [-5, 5]
+          start.horizontal_speed: [-1, 1]
+          start.engine_on: 1
+          start.initial_throttle: 0.4
+          start.ignitions: 10
+          landing.pad_half_width: 60
+          landing.max_vertical_speed: 5.0
+          landing.max_horizontal_speed: 3.0
+          landing.max_tilt_deg: 15
+          landing.max_angular_rate: 0.3
+      promote_at: 0.6
+      window: 500
+    - name: realistic_hop_low
+      task:
+        config: realistic
+        overrides:
+          start.altitude: [24, 40]
+          start.vertical_speed: [-4, -1]
+          start.horizontal_offset: [-8, 8]
+          start.horizontal_speed: [-1, 1]
+          start.engine_on: 1
+          start.initial_throttle: 0.4
+          start.ignitions: 8
+          landing.pad_half_width: 60
+          landing.max_vertical_speed: 4.0
+          landing.max_horizontal_speed: 2.5
+          landing.max_tilt_deg: 12
+          landing.max_angular_rate: 0.2
+      promote_at: 0.5
+      window: 500
+    - name: realistic_hop
+      task:
+        config: realistic
+        overrides:
+          start.altitude: [40, 80]
+          start.vertical_speed: [-8, -2]
+          start.horizontal_offset: [-15, 15]
+          start.horizontal_speed: [-2, 2]
+          start.engine_on: 1
+          start.initial_throttle: 0.4
+          start.ignitions: 5
+          landing.pad_half_width: 40
+          landing.max_vertical_speed: 3.0
+          landing.max_horizontal_speed: 2.0
+          landing.max_tilt_deg: 10
+      promote_at: 0.5
+      window: 500
+    - name: realistic_ignite
+      task:
+        config: realistic
+        overrides:
+          start.altitude: [150, 400]
+          start.vertical_speed: [-40, -20]
+          start.horizontal_offset: [-30, 30]
+          start.horizontal_speed: [-2, 2]
+          start.ignitions: 3
+      promote_at: 0.5
+      window: 1000
+    - name: realistic_mid
+      task:
+        config: realistic
+        overrides:
+          start.altitude: [400, 700]
+          start.vertical_speed: [-70, -40]
+          start.horizontal_offset: [-50, 50]
+          start.horizontal_speed: [-3, 3]
+          start.ignitions: 2
+      promote_at: 0.5
+      window: 1000
+    - name: realistic_low
+      task:
+        config: realistic
+        overrides:
+          start.altitude: [700, 1000]
+          start.vertical_speed: [-70, -50]
+      promote_at: 0.5
+      window: 1000
+    - name: realistic
+      task: {config: realistic}
+      promote_at: 0.6
+      window: 1000
+    - name: realistic_hard
+      task:
+        config: realistic
+        overrides:
+          start.tilt_deg: [-15, 15]
+          start.angular_rate: [-0.05, 0.05]
+          wind.gust_rate: 0.1
+          wind.gust_amplitude: [4, 14]
+        randomization:          # the full ranges
+          dry_mass: [0.95, 1.05]
+          propellant: [0.9, 1.1]
+          wind: [0.0, 1.5]
+          thrust_time_constant: [0.8, 1.25]
+          gimbal_time_constant: [0.8, 1.25]
+          sensor_noise: [0.5, 1.5]
+          sensor_delay: [0, 9]  # ticks; the battery's delayed case uses 10
+
+# Validation during training: deterministic policy on fixed seeds of the
+# target task. Validation seeds start at 2,000,000, apart from evaluation
+# (from 0) and controller tuning (from 1,000,000), so checkpoint selection
+# never sees the evaluation seeds.
+validation:
+  every_steps: 2_000_000
+  episodes: 200
+  seed_start: 2_000_000
+  tasks:
+    easy: {config: easy}
+    realistic: {config: realistic}
+  select_on: realistic      # the best checkpoint maximizes this success rate

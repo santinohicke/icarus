@@ -8,6 +8,8 @@
 //! at a time (concurrent calls on the same object raise `RuntimeError:
 //! Already borrowed`).
 
+mod env;
+
 use icarus_core::physics::scenario::Outcome;
 use icarus_core::physics::state::QUANT_MAX;
 use icarus_core::replay::REPLAY_FORMAT_VERSION;
@@ -613,6 +615,13 @@ fn icarus(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySim>()?;
     m.add_class::<PyRecorder>()?;
     m.add_class::<PyController>()?;
+    m.add_class::<env::PyEnv>()?;
+    m.add_class::<env::PyVecEnv>()?;
+    m.add_function(wrap_pyfunction!(env::episode_seed, m)?)?;
+    m.add_function(wrap_pyfunction!(env::default_env_config, m)?)?;
+    m.add_function(wrap_pyfunction!(env::obs_fields, m)?)?;
+    m.add_function(wrap_pyfunction!(env::override_keys, m)?)?;
+    m.add("ACTION_DIM", icarus_core::env::ACTION_DIM)?;
     m.add_function(wrap_pyfunction!(evaluate, m)?)?;
     m.add_function(wrap_pyfunction!(scenarios, m)?)?;
     m.add_function(wrap_pyfunction!(controllers, m)?)?;

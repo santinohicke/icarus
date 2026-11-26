@@ -583,6 +583,38 @@ impl Params {
         libm::ceil(self.limits.max_time / self.dt - 1e-9) as u64
     }
 
+    /// Height above the ground of the lowest point (leg tip or nose) at the
+    /// lowest start altitude, over the start tilt range and both ends of the
+    /// start mass. The nose's height is concave in the tilt (its minimum is
+    /// at an end of the range), but a leg tip's height
+    /// `y − h_cm·cos θ − span·|sin θ|` is convex on each side, lowest at
+    /// `θ = ±atan(span / h_cm)` (about 31°): those tilts are checked too when
+    /// they lie in the range. Only meaningful for otherwise valid parameters.
+    pub fn lowest_start_clearance(&self) -> f64 {
+        let st = &self.start;
+        let v = &self.vehicle;
+        let mut lowest = f64::INFINITY;
+        for propellant in [st.propellant.min, st.propellant.max] {
+            let mass = v.dry_mass + propellant;
+            let cm = crate::physics::dynamics::mass_properties(v, mass).cm_height;
+            let worst_leg = libm::atan2(v.leg_half_span, cm);
+            for theta in [st.tilt.min, st.tilt.max, worst_leg, -worst_leg] {
+                if theta < st.tilt.min || theta > st.tilt.max {
+                    continue;
+                }
+                let s = crate::physics::state::State {
+                    y: st.altitude.min,
+                    theta,
+                    mass,
+                    ..Default::default()
+                };
+                let c = crate::physics::scenario::contact_geometry(v, &s).clearance;
+                lowest = lowest.min(c);
+            }
+        }
+        lowest
+    }
+
     /// Checks that every parameter is finite and physically meaningful.
     pub fn validate(&self) -> Result<(), ParamError> {
         fn check(ok: bool, what: &str) -> Result<(), ParamError> {
@@ -713,10 +745,6 @@ impl Params {
             check(r.is_valid(), &format!("invalid start range {name}"))?;
         }
         check(
-            st.altitude.min > v.length + v.leg_half_span,
-            "start altitude must clear the ground",
-        )?;
-        check(
             st.altitude.max < self.limits.max_altitude,
             "start altitude above the altitude limit",
         )?;
@@ -730,6 +758,10 @@ impl Params {
             "start tilt must be within ±45°",
         )?;
         check(st.propellant.min >= 0.0, "start propellant must be >= 0")?;
+        check(
+            self.lowest_start_clearance() > 0.0,
+            "start altitude must clear the ground at every start tilt and mass",
+        )?;
         check(
             !st.engine_on || (st.initial_throttle >= v.min_throttle && st.initial_throttle <= 1.0),
             "initial throttle must be in [min_throttle, 1]",
@@ -875,6 +907,46 @@ mod tests {
         let mut p = Params::easy();
         p.faults.stuck_angle = Range::new(0.0, 10.0 * DEG);
         assert!(p.validate().is_err(), "stuck angle beyond the gimbal range");
+    }
+
+    #[test]
+    fn start_altitude_is_checked_against_the_real_geometry() {
+        // The tail just above the ground, upright: valid (a short hop).
+        let mut p = Params::training();
+        let cm =
+            crate::physics::dynamics::mass_properties(&p.vehicle, p.vehicle.dry_mass).cm_height;
+        p.start.altitude = Range::new(cm + 0.2, cm + 3.0);
+        p.start.tilt = Range::fixed(0.0);
+        assert!(p.validate().is_ok(), "{:?}", p.validate());
+        assert!(p.lowest_start_clearance() > 0.0);
+        // Tilted 40°, the low leg tip is below the ground: invalid.
+        p.start.tilt = Range::symmetric(40.0 * DEG);
+        assert!(p.lowest_start_clearance() < 0.0);
+        assert!(p.validate().is_err());
+        // The low leg tip is lowest at an interior tilt (about 31°), not at
+        // the ends of a ±40° range: an altitude that clears the ends but not
+        // that tilt is rejected.
+        let mut p = Params::training();
+        p.start.tilt = Range::symmetric(40.0 * DEG);
+        let at = |p: &Params, theta: f64| {
+            let s = crate::physics::state::State {
+                y: p.start.altitude.min,
+                theta,
+                mass: p.vehicle.dry_mass + p.start.propellant.min,
+                ..Default::default()
+            };
+            crate::physics::scenario::contact_geometry(&p.vehicle, &s).clearance
+        };
+        p.start.altitude = Range::new(20.0, 30.0);
+        let shift = -at(&p, 40.0 * DEG) + 0.05; // the ends just clear the ground
+        p.start.altitude = Range::new(20.0 + shift, 30.0 + shift);
+        assert!(at(&p, 40.0 * DEG) > 0.0 && at(&p, -40.0 * DEG) > 0.0);
+        assert!(p.lowest_start_clearance() < 0.0, "interior tilt is lower");
+        assert!(p.validate().is_err());
+        // Every built-in configuration starts well clear.
+        for c in VehicleConfig::ALL {
+            assert!(c.params().lowest_start_clearance() > 50.0, "{}", c.name());
+        }
     }
 
     #[test]
